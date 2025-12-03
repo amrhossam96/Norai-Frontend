@@ -36,9 +36,6 @@ export function DynamicCodeSnippet({ tabs, defaultLanguage }: DynamicCodeSnippet
       <DynamicCodeBlock 
         lang={activeTab.language}
         code={activeTab.code}
-        options={{
-          theme: 'github-dark', // or any other theme you prefer
-        }}
       />
     </div>
   );

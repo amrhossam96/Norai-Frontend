@@ -91,7 +91,8 @@ export function useMDXComponentsOblien(components: MDXComponents): MDXComponents
       }
       
       // Default to regular code block
-      return components.pre?.({ children, ...props }) || <pre {...props}>{children}</pre>;
+      // @ts-ignore - components.pre might be string or component
+      return (typeof components.pre === 'function' ? components.pre({ children, ...props }) : null) || <pre {...props}>{children}</pre>;
     },
     code: ({ className, children, ...props }) => {
       const language = className ? className.replace('language-', '') : 'text';
