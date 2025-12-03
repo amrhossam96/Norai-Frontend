@@ -1,0 +1,227 @@
+---
+title: Support
+description: Get help with Norai integration and troubleshooting
+---
+
+# Support
+
+Need help with Norai? We're here to assist you with integration, troubleshooting, and any questions you might have.
+
+## Documentation
+
+Start with our comprehensive documentation:
+
+- [Getting Started](/docs) - Overview and quick start guide
+- [Authentication](/docs/authentication) - API key setup and security
+- [Event Tracking](/docs/event-tracking) - Track user events
+- [User Identification](/docs/user-identification) - Identify and manage users
+- [Recommendations API](/docs/recommendations-api) - Generate personalized recommendations
+- [User Segmentation](/docs/user-segmentation) - Segment users automatically
+- [Error Handling](/docs/error-handling) - Handle errors gracefully
+- [Rate Limits](/docs/rate-limits) - Understand and optimize rate limits
+
+## Community Support
+
+### GitHub Discussions
+
+Join our community on GitHub:
+- Ask questions
+- Share best practices
+- Report issues
+- Request features
+
+[Visit GitHub Discussions →](https://github.com/norai/discussions)
+
+### Stack Overflow
+
+Tag your questions with `norai` on Stack Overflow:
+```
+https://stackoverflow.com/questions/tagged/norai
+```
+
+## Email Support
+
+### Free Tier
+- **Response time**: 2-3 business days
+- **Channel**: community@norai.com
+- **Scope**: General questions and documentation clarification
+
+### Professional Tier
+- **Response time**: 24 hours
+- **Channel**: support@norai.com
+- **Scope**: Integration help, bug reports, and technical assistance
+
+### Enterprise Tier
+- **Response time**: 4 hours (business hours)
+- **Channel**: Dedicated Slack channel + enterprise@norai.com
+- **Scope**: Full technical support, architecture consultation, and SLA guarantees
+
+## Status Page
+
+Check the current status of Norai services:
+
+[status.norai.com →](https://status.norai.com)
+
+Subscribe to status updates to be notified of:
+- Scheduled maintenance
+- Service disruptions
+- Incident reports
+- Performance updates
+
+## Common Issues
+
+### Authentication Issues
+
+**Problem**: Invalid API key error
+
+**Solution**:
+1. Check that your API key is correct and hasn't expired
+2. Ensure you're using the correct format: `Bearer YOUR_API_KEY`
+3. Verify the API key has the necessary permissions
+4. Generate a new key if needed from your developer account
+
+### Rate Limiting
+
+**Problem**: 429 Too Many Requests error
+
+**Solution**:
+1. Check your current rate limits in your developer account
+2. Implement exponential backoff retry logic
+3. Use batch endpoints to reduce API calls
+4. Cache recommendations when possible
+5. Consider upgrading your account tier
+
+### SDK Integration
+
+**Problem**: SDK not tracking events
+
+**Solution**:
+1. Verify SDK is properly configured with API key and project ID
+2. Check that you have network connectivity
+3. Enable debug logging to see what's being sent
+4. Ensure events are formatted correctly
+5. Check for any console errors
+
+### Missing Recommendations
+
+**Problem**: Recommendations API returning empty results
+
+**Solution**:
+1. Ensure you have tracked enough events (minimum 100 events per user)
+2. Verify the user ID exists in your project
+3. Check if the user has any recent activity
+4. Try requesting more recommendations (higher limit)
+5. Use fallback logic to show popular items
+
+## Report a Bug
+
+When reporting a bug, please include:
+
+### Required Information
+- **API endpoint**: Which endpoint you're calling
+- **Request details**: Full request (headers and body, excluding API keys)
+- **Response received**: Complete error response
+- **Expected behavior**: What you expected to happen
+- **Environment**: Production, staging, or development
+- **SDK version** (if using SDK): iOS SDK version number
+
+### Example Bug Report
+
+```
+Subject: Recommendations API returning 500 error
+
+Endpoint: POST /ml/generate-recommendations
+Environment: Production
+Date/Time: 2025-12-03 14:30:00 UTC
+
+Request:
+{
+  "project_id": "proj_abc123",
+  "external_user_id": "user_123",
+  "limit": 10
+}
+
+Response:
+{
+  "error": {
+    "code": "internal_server_error",
+    "message": "An unexpected error occurred"
+  }
+}
+
+Expected: Array of 10 recommendations
+Actual: 500 Internal Server Error
+
+Additional context: This started happening after updating to v2 of the API
+```
+
+## Feature Requests
+
+We love hearing your ideas! Submit feature requests:
+
+1. **GitHub Issues**: Create a feature request issue
+2. **Email**: features@norai.com
+3. **Roadmap**: Vote on existing feature requests
+
+Include in your request:
+- Use case and problem you're trying to solve
+- Expected behavior
+- Any relevant examples or mockups
+- Business impact
+
+## SDK Resources
+
+### iOS SDK
+- [GitHub Repository](https://github.com/norai/norai-swift-sdk)
+- [API Reference](https://docs.norai.com/sdk/ios)
+- [Sample App](https://github.com/norai/norai-swift-sample)
+
+### Android SDK (Coming Soon)
+- [Waitlist](https://norai.com/android-waitlist)
+- [Early Access](https://norai.com/early-access)
+
+### React Native SDK (Coming Soon)
+- [Waitlist](https://norai.com/rn-waitlist)
+
+## Best Practices
+
+Before reaching out for support:
+
+1. **Check documentation**: Review relevant docs and examples
+2. **Search community**: Look for similar questions in GitHub Discussions
+3. **Review error messages**: Read error messages carefully for hints
+4. **Test in isolation**: Isolate the issue to a specific endpoint or operation
+5. **Check status page**: Ensure there are no ongoing incidents
+
+## Emergency Support
+
+For critical production issues (Enterprise tier only):
+
+- **Phone**: +1 (555) 123-4567
+- **Emergency email**: emergency@norai.com
+- **Response time**: 1 hour, 24/7
+
+Critical issues include:
+- Complete service outage
+- Data loss or corruption
+- Security vulnerabilities
+- Payment processing failures
+
+## Feedback
+
+We value your feedback! Let us know how we're doing:
+
+- **Product feedback**: product@norai.com
+- **Documentation improvements**: docs@norai.com
+- **General feedback**: hello@norai.com
+
+## Connect With Us
+
+- **Twitter**: [@noraidev](https://twitter.com/noraidev)
+- **LinkedIn**: [Norai](https://linkedin.com/company/norai)
+- **Blog**: [blog.norai.com](https://blog.norai.com)
+- **Newsletter**: Subscribe for updates and tips
+
+---
+
+Still need help? Don't hesitate to reach out. We're here to make your integration successful!

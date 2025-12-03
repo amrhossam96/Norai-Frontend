@@ -1,0 +1,60 @@
+---
+title: Norai API Documentation
+description: Behavioral analysis and recommendation engine API for building personalized user experiences
+---
+
+import { ApiBlock } from '@/components/api-block-mdx'
+
+# Norai API Overview
+
+The Norai API provides developers with powerful tools to track user behavior, analyze patterns, and generate intelligent recommendations. Our API is designed with RESTful principles and supports secure authentication methods to integrate seamlessly with your applications.
+
+## Key Features
+
+- **Event Tracking**: Capture user interactions across your app with our iOS SDK (Android & React Native coming soon)
+- **User Identification**: Link anonymous users to identified accounts with unified profiles
+- **ML-Powered Recommendations**: Generate personalized recommendations based on user behavior
+- **User Segmentation**: Automatically segment users based on behavior patterns
+- **Real-Time Analytics**: View comprehensive dashboards and insights
+- **Scalable Infrastructure**: Built to handle millions of events with sub-100ms response times
+
+## Getting Started
+
+To start using Norai, you'll need to:
+
+1. [Create a developer account](/docs/developer-account)
+2. [Generate API credentials](/docs/authentication)
+3. [Integrate the SDK or API](/docs/event-tracking)
+4. [Fetch recommendations](/docs/recommendations-api)
+
+## API Base URLs
+
+**Go Backend (Event Ingestion):**
+```
+https://api.norai.com/v1
+```
+
+**Python ML Layer (Recommendations):**
+```
+https://api.norai.com/ml
+```
+
+## Architecture Overview
+
+Norai uses a two-part architecture:
+
+- **Client SDK (iOS)**: Track events from your mobile app (Android & React Native coming soon)
+- **Server-Side API**: Fetch recommendations and segments from your backend
+
+## Available Documentation Sections
+
+<Cards>
+  <Card title="Authentication" href="/docs/authentication" />
+  <Card title="Developer Account" href="/docs/developer-account" />
+  <Card title="Event Tracking" href="/docs/event-tracking" />
+  <Card title="User Identification" href="/docs/user-identification" />
+  <Card title="Recommendations API" href="/docs/recommendations-api" />
+  <Card title="User Segmentation" href="/docs/user-segmentation" />
+  <Card title="Error Handling" href="/docs/error-handling" />
+  <Card title="Rate Limits" href="/docs/rate-limits" />
+</Cards>

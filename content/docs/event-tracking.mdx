@@ -1,0 +1,175 @@
+---
+title: Event Tracking
+description: Track user events and interactions in your application
+---
+
+import { ApiBlock } from '@/components/api-block-mdx'
+
+# Event Tracking
+
+Track user events and interactions to build a comprehensive understanding of user behavior. Norai's event tracking is simple to integrate and powerful enough to capture any user action.
+
+## iOS SDK (Available Now)
+
+The easiest way to track events is using our iOS SDK:
+
+```swift
+import Norai
+
+// Track a simple event
+Norai.shared.trackEvent(
+    name: "product_tapped",
+    properties: [
+        "product_id": "prod_123",
+        "category": "electronics",
+        "price": 299.99
+    ]
+)
+
+// Track with entity information
+Norai.shared.trackEvent(
+    name: "product_viewed",
+    properties: [
+        "entity": [
+            "external_id": "prod_456",
+            "category": "fashion",
+            "price": 99.99
+        ],
+        "screen": "product_detail",
+        "source": "search"
+    ]
+)
+```
+
+## Android & React Native (Coming Soon)
+
+Android (Kotlin/Java) and React Native SDKs are currently in development. Check back soon for updates.
+
+## Direct API Integration
+
+You can also track events directly via our API if you're not using the SDK:
+
+<ApiBlock
+  method="POST"
+  endpoint="/v1/events"
+  curl={`curl -X POST "https://api.norai.com/v1/events" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "project_id": "your-project-id",
+    "external_user_id": "user_123",
+    "event_name": "product_purchased",
+    "properties": {
+      "product_id": "prod_789",
+      "category": "electronics",
+      "price": 499.99,
+      "quantity": 1
+    },
+    "timestamp": "2025-12-03T10:30:00Z"
+  }'`}
+  nodejs={`const response = await fetch('https://api.norai.com/v1/events', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    project_id: 'your-project-id',
+    external_user_id: 'user_123',
+    event_name: 'product_purchased',
+    properties: {
+      product_id: 'prod_789',
+      category: 'electronics',
+      price: 499.99,
+      quantity: 1
+    },
+    timestamp: new Date().toISOString()
+  })
+});
+
+const data = await response.json();`}
+  python={`import requests
+from datetime import datetime
+
+response = requests.post(
+    "https://api.norai.com/v1/events",
+    headers={
+        "Authorization": "Bearer YOUR_API_KEY",
+        "Content-Type": "application/json"
+    },
+    json={
+        "project_id": "your-project-id",
+        "external_user_id": "user_123",
+        "event_name": "product_purchased",
+        "properties": {
+            "product_id": "prod_789",
+            "category": "electronics",
+            "price": 499.99,
+            "quantity": 1
+        },
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+)
+
+data = response.json()`}
+/>
+
+## Event Properties
+
+Events can include any custom properties relevant to your application:
+
+### Common Event Types
+
+- `product_viewed` - User viewed a product
+- `product_tapped` - User tapped/clicked a product
+- `add_to_cart` - User added item to cart
+- `purchase_completed` - User completed a purchase
+- `screen_viewed` - User viewed a screen
+- `button_clicked` - User clicked a button
+- `search_performed` - User performed a search
+
+### Property Guidelines
+
+- Use snake_case for property names
+- Include entity information when relevant (product_id, content_id, etc.)
+- Add contextual data (category, price, source, etc.)
+- Keep property values simple (strings, numbers, booleans)
+- Use consistent naming across your app
+
+## Batch Event Tracking
+
+For high-volume applications, you can send events in batches:
+
+<ApiBlock
+  method="POST"
+  endpoint="/v1/events/batch"
+  curl={`curl -X POST "https://api.norai.com/v1/events/batch" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "project_id": "your-project-id",
+    "events": [
+      {
+        "external_user_id": "user_123",
+        "event_name": "product_viewed",
+        "properties": {"product_id": "prod_1"},
+        "timestamp": "2025-12-03T10:30:00Z"
+      },
+      {
+        "external_user_id": "user_456",
+        "event_name": "product_viewed",
+        "properties": {"product_id": "prod_2"},
+        "timestamp": "2025-12-03T10:31:00Z"
+      }
+    ]
+  }'`}
+/>
+
+## Best Practices
+
+1. **Track consistently**: Use the same event names across your application
+2. **Include context**: Add relevant properties to each event
+3. **Use entities**: Link events to products, content, or other entities
+4. **Timestamp accuracy**: Include accurate timestamps for historical data
+5. **Identify users**: Call `identify()` when users log in to link anonymous sessions
+

@@ -1,0 +1,293 @@
+---
+title: Error Handling
+description: Understanding and handling errors in the Norai API
+---
+
+# Error Handling
+
+The Norai API uses conventional HTTP response codes to indicate the success or failure of an API request. Errors include helpful error messages and error codes to help you debug issues.
+
+## HTTP Status Codes
+
+| Status Code | Description |
+|------------|-------------|
+| `200 OK` | Request succeeded |
+| `201 Created` | Resource created successfully |
+| `400 Bad Request` | Invalid request parameters |
+| `401 Unauthorized` | Invalid or missing API key |
+| `403 Forbidden` | Insufficient permissions |
+| `404 Not Found` | Resource not found |
+| `429 Too Many Requests` | Rate limit exceeded |
+| `500 Internal Server Error` | Server error |
+| `503 Service Unavailable` | Temporary service outage |
+
+## Error Response Format
+
+All error responses follow this format:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "invalid_request",
+    "message": "The project_id field is required",
+    "details": {
+      "field": "project_id",
+      "type": "missing_required_field"
+    }
+  }
+}
+```
+
+## Common Error Codes
+
+### Authentication Errors
+
+**`invalid_api_key`**
+```json
+{
+  "error": {
+    "code": "invalid_api_key",
+    "message": "The API key provided is invalid or has expired"
+  }
+}
+```
+
+**`missing_api_key`**
+```json
+{
+  "error": {
+    "code": "missing_api_key",
+    "message": "API key is required. Include it in the Authorization header"
+  }
+}
+```
+
+### Validation Errors
+
+**`invalid_request`**
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "Invalid request parameters",
+    "details": {
+      "field": "limit",
+      "message": "Must be between 1 and 100"
+    }
+  }
+}
+```
+
+**`missing_required_field`**
+```json
+{
+  "error": {
+    "code": "missing_required_field",
+    "message": "Required field missing: external_user_id"
+  }
+}
+```
+
+### Resource Errors
+
+**`resource_not_found`**
+```json
+{
+  "error": {
+    "code": "resource_not_found",
+    "message": "User with ID 'user_123' not found"
+  }
+}
+```
+
+**`project_not_found`**
+```json
+{
+  "error": {
+    "code": "project_not_found",
+    "message": "Project with ID 'proj_abc123' not found or access denied"
+  }
+}
+```
+
+### Rate Limit Errors
+
+**`rate_limit_exceeded`**
+```json
+{
+  "error": {
+    "code": "rate_limit_exceeded",
+    "message": "Rate limit exceeded. Try again in 60 seconds",
+    "details": {
+      "retry_after": 60,
+      "limit": 1000,
+      "window": "1h"
+    }
+  }
+}
+```
+
+## Error Handling Best Practices
+
+### 1. Check Status Codes
+
+Always check the HTTP status code before processing the response:
+
+```javascript
+const response = await fetch('https://api.norai.com/ml/generate-recommendations', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(requestData)
+});
+
+if (!response.ok) {
+  const error = await response.json();
+  console.error('API Error:', error);
+  // Handle error appropriately
+}
+
+const data = await response.json();
+```
+
+### 2. Implement Retry Logic
+
+For transient errors (5xx) and rate limits (429), implement exponential backoff:
+
+```javascript
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url, options);
+      
+      if (response.status === 429) {
+        // Rate limited - wait and retry
+        const retryAfter = response.headers.get('Retry-After') || 60;
+        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+        continue;
+      }
+      
+      if (response.status >= 500) {
+        // Server error - exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+        continue;
+      }
+      
+      return response;
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+    }
+  }
+}
+```
+
+### 3. Handle Specific Error Codes
+
+```javascript
+try {
+  const recommendations = await fetchRecommendations(userId);
+} catch (error) {
+  switch (error.code) {
+    case 'invalid_api_key':
+      // Log critical error - API key needs to be updated
+      logger.critical('Invalid API key', error);
+      break;
+      
+    case 'resource_not_found':
+      // User not found - return default recommendations
+      return getDefaultRecommendations();
+      
+    case 'rate_limit_exceeded':
+      // Rate limited - use cached recommendations
+      return getCachedRecommendations(userId);
+      
+    default:
+      // Log and handle unexpected errors
+      logger.error('Unexpected API error', error);
+      return getFallbackRecommendations();
+  }
+}
+```
+
+### 4. Validate Before Sending
+
+Validate your data before making API calls:
+
+```javascript
+function validateEventData(event) {
+  if (!event.project_id) {
+    throw new Error('project_id is required');
+  }
+  if (!event.external_user_id) {
+    throw new Error('external_user_id is required');
+  }
+  if (!event.event_name) {
+    throw new Error('event_name is required');
+  }
+  return true;
+}
+
+try {
+  validateEventData(eventData);
+  await trackEvent(eventData);
+} catch (error) {
+  console.error('Validation error:', error.message);
+}
+```
+
+### 5. Implement Fallback Logic
+
+Always have a fallback when recommendations or segments aren't available:
+
+```javascript
+async function getRecommendations(userId) {
+  try {
+    const response = await fetch('/ml/generate-recommendations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        project_id: PROJECT_ID,
+        external_user_id: userId,
+        limit: 10
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch recommendations');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    // Log error and return fallback recommendations
+    logger.error('Recommendations API error', error);
+    return {
+      recommendations: getPopularItems(),
+      fallback: true
+    };
+  }
+}
+```
+
+## Debugging Tips
+
+1. **Check API key**: Ensure your API key is valid and has the correct permissions
+2. **Verify project ID**: Make sure you're using the correct project ID
+3. **Check request format**: Ensure your request body matches the API specification
+4. **Review rate limits**: Check if you're hitting rate limits
+5. **Monitor logs**: Enable detailed logging to track API calls and responses
+6. **Use test mode**: Test your integration in development before deploying to production
+
+## Getting Help
+
+If you encounter persistent errors or need assistance:
+
+- Check the [support page](/docs/support)
+- Review API documentation for the specific endpoint
+- Contact support with error details and request IDs

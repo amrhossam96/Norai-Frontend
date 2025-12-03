@@ -1,0 +1,202 @@
+---
+title: User Identification
+description: Link anonymous users to identified accounts and manage user profiles
+---
+
+import { ApiBlock } from '@/components/api-block-mdx'
+
+# User Identification
+
+Norai automatically tracks anonymous users and allows you to link them to identified accounts when users log in. This creates a unified user profile across devices and sessions.
+
+## iOS SDK
+
+The easiest way to identify users is with the iOS SDK:
+
+```swift
+import Norai
+
+// When user logs in or signs up
+Norai.shared.identify(
+    userId: "user_123",
+    traits: [
+        "email": "user@example.com",
+        "name": "John Doe",
+        "age": 25,
+        "plan": "premium",
+        "preferences": ["electronics", "gaming"]
+    ]
+)
+
+// Update user traits
+Norai.shared.identify(
+    userId: "user_123",
+    traits: [
+        "plan": "enterprise"
+    ]
+)
+```
+
+## Direct API Integration
+
+You can also identify users via the API:
+
+<ApiBlock
+  method="POST"
+  endpoint="/v1/users/identify"
+  curl={`curl -X POST "https://api.norai.com/v1/users/identify" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "project_id": "your-project-id",
+    "external_user_id": "user_123",
+    "traits": {
+      "email": "user@example.com",
+      "name": "John Doe",
+      "age": 25,
+      "plan": "premium",
+      "signup_date": "2025-01-15",
+      "preferences": ["electronics", "gaming"]
+    }
+  }'`}
+  nodejs={`const response = await fetch('https://api.norai.com/v1/users/identify', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    project_id: 'your-project-id',
+    external_user_id: 'user_123',
+    traits: {
+      email: 'user@example.com',
+      name: 'John Doe',
+      age: 25,
+      plan: 'premium',
+      signup_date: '2025-01-15',
+      preferences: ['electronics', 'gaming']
+    }
+  })
+});
+
+const data = await response.json();`}
+  python={`import requests
+
+response = requests.post(
+    "https://api.norai.com/v1/users/identify",
+    headers={
+        "Authorization": "Bearer YOUR_API_KEY",
+        "Content-Type": "application/json"
+    },
+    json={
+        "project_id": "your-project-id",
+        "external_user_id": "user_123",
+        "traits": {
+            "email": "user@example.com",
+            "name": "John Doe",
+            "age": 25,
+            "plan": "premium",
+            "signup_date": "2025-01-15",
+            "preferences": ["electronics", "gaming"]
+        }
+    }
+)
+
+data = response.json()`}
+/>
+
+## User Traits
+
+Traits are attributes of your users that help personalize recommendations and segment audiences.
+
+### Common Traits
+
+- `email` - User's email address
+- `name` - User's full name
+- `age` - User's age
+- `plan` - Subscription plan (free, premium, enterprise)
+- `signup_date` - When the user signed up
+- `preferences` - User's interests or preferences
+- `location` - User's location
+- `device_type` - Type of device (mobile, tablet, desktop)
+
+### Trait Guidelines
+
+- Use snake_case for trait names
+- Keep trait values simple (strings, numbers, booleans, arrays)
+- Update traits when user information changes
+- Include traits that help with segmentation and personalization
+
+## Anonymous to Identified Flow
+
+Norai automatically handles the transition from anonymous to identified users:
+
+1. **Anonymous tracking**: User browses your app without logging in
+2. **Event capture**: Events are tracked with a device ID
+3. **User identification**: User logs in or signs up
+4. **Profile merging**: Anonymous session is linked to the user account
+5. **Unified profile**: All events are now associated with the identified user
+
+## Multi-Device Support
+
+Norai automatically handles users across multiple devices:
+
+```swift
+// Device 1 (iPhone)
+Norai.shared.identify(userId: "user_123", traits: ["device": "iPhone 15"])
+
+// Device 2 (iPad)
+Norai.shared.identify(userId: "user_123", traits: ["device": "iPad Pro"])
+```
+
+Both devices will be linked to the same user profile, creating a complete view of user behavior across all touchpoints.
+
+## Get User Profile
+
+Retrieve a user's complete profile and activity:
+
+<ApiBlock
+  method="GET"
+  endpoint="/v1/users/:userId"
+  curl={`curl -X GET "https://api.norai.com/v1/users/user_123?project_id=your-project-id" \\
+  -H "Authorization: Bearer YOUR_API_KEY"`}
+  nodejs={`const response = await fetch('https://api.norai.com/v1/users/user_123?project_id=your-project-id', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY'
+  }
+});
+
+const userData = await response.json();`}
+/>
+
+### Example Response
+
+```json
+{
+  "success": true,
+  "user": {
+    "external_user_id": "user_123",
+    "traits": {
+      "email": "user@example.com",
+      "name": "John Doe",
+      "age": 25,
+      "plan": "premium"
+    },
+    "first_seen": "2025-01-15T10:30:00Z",
+    "last_seen": "2025-12-03T14:25:00Z",
+    "total_events": 1523,
+    "devices": ["iPhone", "iPad"],
+    "segment": "high_engagement"
+  }
+}
+```
+
+## Best Practices
+
+1. **Identify early**: Call `identify()` as soon as a user logs in
+2. **Include relevant traits**: Add traits that help with personalization
+3. **Update when changed**: Update traits when user information changes
+4. **Privacy compliance**: Only track traits you have permission to collect
+5. **Consistent IDs**: Use the same user ID across your application
+
