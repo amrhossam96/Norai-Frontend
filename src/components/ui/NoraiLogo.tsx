@@ -3,6 +3,7 @@ import Link from 'next/link';
 interface NoraiLogoProps {
   size?: 'sm' | 'md' | 'lg';
   showText?: boolean;
+  showBeta?: boolean;
   className?: string;
   href?: string;
   textColor?: string;
@@ -11,7 +12,8 @@ interface NoraiLogoProps {
 
 export default function NoraiLogo({ 
   size = 'md', 
-  showText = true, 
+  showText = true,
+  showBeta = true,
   className = '', 
   href = '/',
   textColor = 'text-white',
@@ -49,7 +51,14 @@ export default function NoraiLogo({
         </svg>
       </div>
       {showText && (
-        <span className={`font-light ${textSizeClasses[size]} ${textColor}`}>Norai</span>
+        <div className="flex items-center gap-2">
+          <span className={`font-light ${textSizeClasses[size]} ${textColor}`}>Norai</span>
+          {showBeta && (
+            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-white/10 border border-white/20 rounded text-white/80 uppercase tracking-wider">
+              Beta
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
