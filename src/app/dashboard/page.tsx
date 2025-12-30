@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import { getProjectOverview } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useDashboard } from '@/contexts/DashboardContext';
-import UserMap from '@/components/dashboard/UserMap';
 
 export default function DashboardPage() {
   const { selectedProjectId } = useDashboard();
@@ -198,23 +197,6 @@ export default function DashboardPage() {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* User Distribution Map */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
-          <h2 className="text-xl font-semibold mb-4">User Distribution</h2>
-          <div className="h-64">
-            <UserMap
-              data={[
-                { code: 'NA', name: 'North America', users: overview?.users_by_region?.na || 12500 },
-                { code: 'SA', name: 'South America', users: overview?.users_by_region?.sa || 3200 },
-                { code: 'EU', name: 'Europe', users: overview?.users_by_region?.eu || 18900 },
-                { code: 'AS', name: 'Asia', users: overview?.users_by_region?.as || 24500 },
-                { code: 'OC', name: 'Oceania', users: overview?.users_by_region?.oc || 1800 },
-                { code: 'AF', name: 'Africa', users: overview?.users_by_region?.af || 4200 },
-              ]}
-              height={256}
-            />
-          </div>
-        </div>
 
         {/* Top Events */}
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
