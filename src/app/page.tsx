@@ -17,11 +17,16 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user is authenticated and redirect to dashboard
+    // If user is logged in, redirect to dashboard (like big tech companies)
     if (isAuthenticated()) {
-      router.push('/dashboard');
+      router.replace('/dashboard');
     }
   }, [router]);
+
+  // If authenticated, don't render landing page (will redirect)
+  if (isAuthenticated()) {
+    return null;
+  }
 
   return (
     <>

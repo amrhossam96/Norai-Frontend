@@ -94,8 +94,22 @@ export async function activateAccount(token: string): Promise<void> {
 
 // ==================== Projects ====================
 
-export async function getProjects() {
-  const response = await fetch(`${API_URL}/v1/projects`, {
+export interface Project {
+  id: string;
+  owner_id: string;
+  name: string;
+  slug: string;
+  description: string;
+  status: 'active' | 'suspended' | 'archived';
+  settings: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export async function getProjects(includeArchived: boolean = false): Promise<Project[]> {
+  const query = includeArchived ? '?include_archived=true' : '';
+  const response = await fetch(`${API_URL}/v1/projects${query}`, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -105,23 +119,123 @@ export async function getProjects() {
     throw new Error(errorMessage);
   }
 
-  const data: SuccessResponse<any[]> | any[] = await response.json();
-  
-  // Handle both wrapped and unwrapped responses
-  if (data && typeof data === 'object' && 'data' in data) {
-    return (data as SuccessResponse<any[]>).data || [];
-  }
-  
-  // If it's already an array, return it
-  if (Array.isArray(data)) {
-    return data;
-  }
-  
-  // Fallback to empty array
-  return [];
+  const data: SuccessResponse<Project[]> = await response.json();
+  return data.data || [];
 }
 
-export async function getProjectOverview(projectId: string, startDate?: string, endDate?: string) {
+export async function createProject(
+  name: string,
+  slug: string,
+  description?: string,
+  settings?: Record<string, any>
+): Promise<Project> {
+  const response = await fetch(`${API_URL}/v1/projects`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name,
+      slug,
+      description: description || '',
+      settings: settings || {},
+    }),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  const data: SuccessResponse<Project> = await response.json();
+  return data.data;
+}
+
+export async function updateProject(
+  projectId: string,
+  updates: {
+    name?: string;
+    description?: string;
+    slug?: string;
+    status?: 'active' | 'suspended' | 'archived';
+    settings?: Record<string, any>;
+  }
+): Promise<Project> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}`, {
+    method: 'PUT',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  const data: SuccessResponse<Project> = await response.json();
+  return data.data;
+}
+
+export async function archiveProject(projectId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/archive`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  // Archive returns 204 No Content
+  if (response.status !== 204) {
+    throw new Error('Archive failed');
+  }
+}
+
+export async function unarchiveProject(projectId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/unarchive`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  // Unarchive returns 204 No Content
+  if (response.status !== 204) {
+    throw new Error('Unarchive failed');
+  }
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  // Delete returns 204 No Content
+  if (response.status !== 204) {
+    throw new Error('Delete failed');
+  }
+}
+
+export async function getProjectOverview(
+  projectId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<{ overview: any }> {
   const params = new URLSearchParams();
   if (startDate) params.append('start_date', startDate);
   if (endDate) params.append('end_date', endDate);
@@ -136,27 +250,7 @@ export async function getProjectOverview(projectId: string, startDate?: string, 
     throw new Error(errorMessage);
   }
 
-  return response.json();
-}
-
-export async function createProject(name: string, slug: string, description?: string, settings?: Record<string, any>) {
-  const response = await fetch(`${API_URL}/v1/projects`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({
-      name,
-      slug,
-      description: description || '',
-      settings: settings || {},
-    }),
-  });
-
-  if (!response.ok) {
-    const errorMessage = await parseErrorResponse(response);
-    throw new Error(errorMessage);
-  }
-
-  const data: SuccessResponse<any> = await response.json();
+  const data: SuccessResponse<{ overview: any }> = await response.json();
   return data.data;
 }
 

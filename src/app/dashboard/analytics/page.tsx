@@ -14,8 +14,10 @@ export default function AnalyticsPage() {
   const [comparisonData, setComparisonData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Default to last 30 days
+  // Default to last 30 days (ending 2 days ago to avoid future date issues)
   const today = new Date();
+  const twoDaysAgo = new Date(today);
+  twoDaysAgo.setDate(today.getDate() - 2);
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(today.getDate() - 30);
   
@@ -23,7 +25,7 @@ export default function AnalyticsPage() {
     thirtyDaysAgo.toISOString().split('T')[0]
   );
   const [endDate, setEndDate] = useState(
-    today.toISOString().split('T')[0]
+    twoDaysAgo.toISOString().split('T')[0]
   );
   
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
@@ -33,6 +35,13 @@ export default function AnalyticsPage() {
   useEffect(() => {
     const loadAnalytics = async () => {
       if (!selectedProjectId || !startDate || !endDate) {
+        return;
+      }
+
+      // Validate dates are not in the future
+      const todayString = new Date().toISOString().split('T')[0];
+      if (endDate > todayString) {
+        // Silently skip if end date is in the future (user hasn't selected dates yet)
         return;
       }
 
@@ -59,7 +68,11 @@ export default function AnalyticsPage() {
         );
         setComparisonData(comparison.comparison || comparison);
       } catch (error: any) {
-        toast.error(error.message || 'Failed to load analytics');
+        const errorMessage = error.message || 'Failed to load analytics';
+        // Only show error if it's not a date validation error (suppress "future date" errors)
+        if (!errorMessage.toLowerCase().includes('future')) {
+          toast.error(errorMessage);
+        }
         setTimeSeriesData(null);
         setComparisonData(null);
       } finally {
