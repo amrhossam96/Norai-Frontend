@@ -26,7 +26,6 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
   // Form state
   const [eventName, setEventName] = useState('');
   const [selectedTaxonomyId, setSelectedTaxonomyId] = useState('');
-  const [customWeight, setCustomWeight] = useState('');
   const [description, setDescription] = useState('');
 
   // Taxonomy form state
@@ -73,7 +72,6 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
       // Reset form when modal closes
       setEventName('');
       setSelectedTaxonomyId('');
-      setCustomWeight('');
       setDescription('');
     }
   }, [isModalOpen]);
@@ -93,13 +91,11 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
         projectId,
         eventName.trim(),
         selectedTaxonomyId,
-        customWeight ? parseFloat(customWeight) : undefined,
         description.trim() || undefined
       );
       toast.success('Event type registered successfully!');
       setEventName('');
       setSelectedTaxonomyId('');
-      setCustomWeight('');
       setDescription('');
       setIsModalOpen(false);
       loadEventTypes(); // Refresh the list
@@ -211,9 +207,15 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
                             {taxonomy.category_name}
                           </span>
                         )}
-                        {eventType.custom_weight !== undefined && (
-                          <span className="px-2 py-1 text-xs bg-white/10 rounded border border-white/20">
-                            Weight: {eventType.custom_weight}
+                        {eventType.status && (
+                          <span className={`px-2 py-1 text-xs rounded border ${
+                            eventType.status === 'active' 
+                              ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                              : eventType.status === 'draft'
+                              ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                              : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                          }`}>
+                            {eventType.status}
                           </span>
                         )}
                       </div>
@@ -326,26 +328,6 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
                     {selectedTaxonomy.description}
                   </p>
                 )}
-              </div>
-
-              <div>
-                <label htmlFor="customWeight" className="block text-sm font-medium text-gray-300 mb-2">
-                  Custom Weight (Optional)
-                </label>
-                <input
-                  id="customWeight"
-                  type="number"
-                  step="0.01"
-                  min="-1"
-                  max="1"
-                  value={customWeight}
-                  onChange={(e) => setCustomWeight(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-white/20 focus:bg-white/10 transition-all cursor-text"
-                  placeholder="Override taxonomy weight (-1 to 1)"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Override the taxonomy weight for this event type. Range: -1 to 1
-                </p>
               </div>
 
               <div>
@@ -536,9 +518,15 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
                               {taxonomy.category_name}
                             </span>
                           )}
-                          {eventType.custom_weight !== undefined && (
-                            <span className="px-2 py-1 text-xs bg-white/10 rounded border border-white/20">
-                              Weight: {eventType.custom_weight}
+                          {eventType.status && (
+                            <span className={`px-2 py-1 text-xs rounded border ${
+                              eventType.status === 'active' 
+                                ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                                : eventType.status === 'draft'
+                                ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                                : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                            }`}>
+                              {eventType.status}
                             </span>
                           )}
                         </div>

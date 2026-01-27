@@ -32,34 +32,22 @@ export default function UsersPage() {
 
       try {
         setIsLoading(true);
-        const offset = (page - 1) * limit;
         const response = await getUsers(selectedProjectId, {
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
+          page,
           limit,
-          offset,
         });
 
-        // Handle both wrapped and unwrapped responses
-        let usersData: any[] = [];
-        let totalCount = 0;
-
-        if (Array.isArray(response)) {
-          usersData = response;
-          totalCount = response.length;
-        } else if (response && typeof response === 'object') {
-          // Try different possible response structures
-          usersData = response.data || response.users || response.results || [];
-          totalCount = response.total || response.count || response.total_count || usersData.length;
-        }
-
-        // Ensure usersData is always an array
-        if (!Array.isArray(usersData)) {
-          usersData = [];
-        }
+        // Response structure: { users: [], has_more: bool }
+        const usersData = response.users || [];
+        const hasMore = response.has_more || false;
+        
+        // Estimate total based on current page and hasMore
+        const estimatedTotal = hasMore 
+          ? (page * limit) + 1 
+          : ((page - 1) * limit) + usersData.length;
 
         setUsers(usersData);
-        setTotal(totalCount);
+        setTotal(estimatedTotal);
       } catch (error: any) {
         toast.error(error.message || 'Failed to load users');
         setUsers([]);
@@ -80,13 +68,8 @@ export default function UsersPage() {
 
       try {
         setIsLoadingSummary(true);
-        const summary = await getUserSummary(
-          selectedProjectId,
-          selectedUser,
-          startDate || undefined,
-          endDate || undefined
-        );
-        setUserSummary(summary.summary || summary);
+        const summary = await getUserSummary(selectedProjectId, selectedUser);
+        setUserSummary(summary);
       } catch (error: any) {
         toast.error(error.message || 'Failed to load user summary');
         setUserSummary(null);
@@ -277,9 +260,9 @@ export default function UsersPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Sessions</div>
+                    <div className="text-xs text-gray-500 mb-1">Event Types</div>
                     <div className="text-lg font-bold">
-                      {userSummary.total_sessions?.toLocaleString() || '0'}
+                      {userSummary.event_types?.length || 0}
                     </div>
                   </div>
                   <div>
@@ -300,16 +283,19 @@ export default function UsersPage() {
                   </div>
                 </div>
 
-                {userSummary.top_events && userSummary.top_events.length > 0 && (
+                {userSummary.event_counts_by_type && Object.keys(userSummary.event_counts_by_type).length > 0 && (
                   <div className="pt-4 border-t border-white/10">
-                    <div className="text-xs text-gray-500 mb-2">Top Events</div>
+                    <div className="text-xs text-gray-500 mb-2">Event Counts by Type</div>
                     <div className="space-y-2">
-                      {userSummary.top_events.slice(0, 5).map((event: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between text-sm">
-                          <span className="text-gray-300">{event.event_type || event.name}</span>
-                          <span className="text-gray-500">{event.count}</span>
-                        </div>
-                      ))}
+                      {Object.entries(userSummary.event_counts_by_type)
+                        .sort(([, a], [, b]) => (b as number) - (a as number))
+                        .slice(0, 5)
+                        .map(([eventType, count], index) => (
+                          <div key={index} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-300">{eventType}</span>
+                            <span className="text-gray-500">{count as number}</span>
+                          </div>
+                        ))}
                     </div>
                   </div>
                 )}

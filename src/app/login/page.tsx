@@ -23,8 +23,9 @@ export default function LoginPage() {
     try {
       const token = await login(email, password);
 
-      // Store token and email
+      // Store token
       setAuthToken(token);
+      // Store email for display purposes
       localStorage.setItem('user_email', email);
 
       toast.success('Logged in successfully!');

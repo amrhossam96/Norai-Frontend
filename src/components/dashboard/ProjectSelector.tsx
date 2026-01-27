@@ -21,26 +21,27 @@ export default function ProjectSelector({
   const loadProjects = async () => {
     try {
       setIsLoading(true);
-      // Only load active projects by default
-      const data = await getProjects(false);
+      const data = await getProjects();
       
       // Ensure data is an array
       const projectsArray = Array.isArray(data) ? data : [];
       
+      // Filter to only non-archived projects
+      const activeProjects = projectsArray.filter(p => !p.is_archived);
+      
       // Check if currently selected project still exists BEFORE updating state
       if (selectedProjectId) {
-        const selectedExists = projectsArray.some(p => p.id === selectedProjectId && p.status === 'active');
+        const selectedExists = activeProjects.some(p => p.id === selectedProjectId);
         if (!selectedExists) {
-          // Selected project was deleted, clear selection first
+          // Selected project was deleted or archived, clear selection first
           onProjectChange(null as any);
         }
       }
       
       // Update projects state
-      setProjects(projectsArray);
+      setProjects(activeProjects);
       
       // Auto-select first active project if none selected
-      const activeProjects = projectsArray.filter(p => p.status === 'active');
       if (activeProjects.length > 0 && !selectedProjectId) {
         onProjectChange(activeProjects[0].id);
       }
@@ -61,7 +62,7 @@ export default function ProjectSelector({
     const checkAndRefresh = async () => {
       if (selectedProjectId) {
         // Check if selected project still exists in current projects list
-        const projectExists = projects.some(p => p.id === selectedProjectId && p.status === 'active');
+        const projectExists = projects.some(p => p.id === selectedProjectId && !p.is_archived);
         if (!projectExists && projects.length > 0) {
           // Selected project doesn't exist but we have projects, reload to get fresh data
           await loadProjects();
@@ -81,7 +82,7 @@ export default function ProjectSelector({
 
   // Only show selected project if it exists in the current projects list
   const selectedProject = selectedProjectId && Array.isArray(projects) 
-    ? projects.find(p => p.id === selectedProjectId && p.status === 'active')
+    ? projects.find(p => p.id === selectedProjectId && !p.is_archived)
     : undefined;
 
   const handleProjectSelect = (projectId: string) => {
@@ -136,12 +137,8 @@ export default function ProjectSelector({
         >
           <div className="flex items-center gap-3">
             <div className={`w-2 h-2 rounded-full ${
-              selectedProject?.status === 'active' 
+              selectedProject && !selectedProject.is_archived
                 ? 'bg-green-400' 
-                : selectedProject?.status === 'archived'
-                ? 'bg-red-400'
-                : selectedProject?.status === 'suspended'
-                ? 'bg-yellow-400'
                 : 'bg-gray-400'
             }`}></div>
             <span className="font-medium">
@@ -160,7 +157,7 @@ export default function ProjectSelector({
             <div className="absolute top-full left-0 right-0 mt-2 bg-black border border-white/10 rounded-lg shadow-xl z-20 max-h-96 overflow-y-auto">
               <div className="p-2">
                 {projects
-                  .filter(project => project.status === 'active') // Only show active projects in dropdown
+                  .filter(project => !project.is_archived)
                   .map((project) => (
                     <button
                       key={project.id}
@@ -175,15 +172,7 @@ export default function ProjectSelector({
                       `}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${
-                          project.status === 'active' 
-                            ? 'bg-green-400' 
-                            : project.status === 'archived'
-                            ? 'bg-red-400'
-                            : project.status === 'suspended'
-                            ? 'bg-yellow-400'
-                            : 'bg-gray-400'
-                        }`}></div>
+                        <div className="w-2 h-2 rounded-full bg-green-400"></div>
                         <div className="flex-1">
                           <div className="font-medium">{project.name}</div>
                           {project.description && (
@@ -219,4 +208,3 @@ export default function ProjectSelector({
     </>
   );
 }
-

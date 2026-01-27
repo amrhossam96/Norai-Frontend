@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { TrendingUp, Calendar, ChevronRight, BarChart3 } from 'lucide-react';
-import { getFunnels, getFunnelDetails } from '@/lib/api-client';
+import { getFunnels, getFunnelAnalytics } from '@/lib/api-client';
 import { useDashboard } from '@/contexts/DashboardContext';
 import { toast } from 'sonner';
 import DatePicker from '@/components/ui/date-picker';
@@ -26,27 +26,8 @@ export default function FunnelsPage() {
 
       try {
         setIsLoading(true);
-        const response = await getFunnels(selectedProjectId, {
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-        });
-
-        // Handle both wrapped and unwrapped responses
-        let funnelsData: any[] = [];
-
-        if (Array.isArray(response)) {
-          funnelsData = response;
-        } else if (response && typeof response === 'object') {
-          // Try different possible response structures
-          funnelsData = response.data || response.funnels || response.results || [];
-        }
-
-        // Ensure funnelsData is always an array
-        if (!Array.isArray(funnelsData)) {
-          funnelsData = [];
-        }
-
-        setFunnels(funnelsData);
+        const funnelsData = await getFunnels(selectedProjectId);
+        setFunnels(Array.isArray(funnelsData) ? funnelsData : []);
       } catch (error: any) {
         toast.error(error.message || 'Failed to load funnels');
         setFunnels([]);
@@ -67,15 +48,15 @@ export default function FunnelsPage() {
 
       try {
         setIsLoadingDetails(true);
-        const details = await getFunnelDetails(
+        const analytics = await getFunnelAnalytics(
           selectedProjectId,
           selectedFunnel,
           startDate || undefined,
           endDate || undefined
         );
-        setFunnelDetails(details.details || details);
+        setFunnelDetails(analytics);
       } catch (error: any) {
-        toast.error(error.message || 'Failed to load funnel details');
+        toast.error(error.message || 'Failed to load funnel analytics');
         setFunnelDetails(null);
       } finally {
         setIsLoadingDetails(false);
@@ -216,45 +197,51 @@ export default function FunnelsPage() {
                     <h3 className="text-md font-semibold mb-4">Funnel Steps</h3>
                     <div className="space-y-4">
                       {funnelDetails.steps.map((step: any, index: number) => {
+                        const startedCount = funnelDetails.started || 1;
                         const previousCount = index === 0 
-                          ? funnelDetails.started 
-                          : funnelDetails.steps[index - 1].count;
-                        const currentCount = step.count || 0;
-                        const dropOff = previousCount - currentCount;
-                        const conversionRate = previousCount > 0 
+                          ? startedCount 
+                          : (funnelDetails.steps[index - 1].users || funnelDetails.steps[index - 1].count || 0);
+                        const currentCount = step.users || step.count || 0;
+                        const dropOff = Math.max(0, previousCount - currentCount);
+                        
+                        // Conversion rate from previous step
+                        const stepConversionRate = previousCount > 0 
                           ? ((currentCount / previousCount) * 100).toFixed(1)
                           : '0';
+                        
+                        // Progress bar width relative to first step (clamped 0-100%)
+                        const progressWidth = Math.min(100, Math.max(0, 
+                          startedCount > 0 ? (currentCount / startedCount) * 100 : 0
+                        ));
 
                         return (
-                          <div key={step.step_id || index} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-sm font-bold">
-                                  {index + 1}
+                          <div key={step.order || step.step_id || index} className="space-y-2">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                                  {step.order || index + 1}
                                 </div>
-                                <div>
-                                  <div className="font-medium">{step.event_type || step.name}</div>
+                                <div className="min-w-0">
+                                  <div className="font-medium truncate">{step.event_type || step.name}</div>
                                   {step.description && (
-                                    <div className="text-xs text-gray-500">{step.description}</div>
+                                    <div className="text-xs text-gray-500 truncate">{step.description}</div>
                                   )}
                                 </div>
                               </div>
-                              <div className="text-right">
+                              <div className="text-right flex-shrink-0">
                                 <div className="font-bold">{currentCount.toLocaleString()}</div>
-                                <div className="text-xs text-gray-500">{conversionRate}%</div>
+                                <div className="text-xs text-gray-500">{stepConversionRate}%</div>
                               </div>
                             </div>
-                            <div className="w-full bg-white/5 rounded-full h-2 ml-11">
+                            <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden">
                               <div
                                 className="bg-white h-2 rounded-full transition-all"
-                                style={{
-                                  width: `${previousCount > 0 ? (currentCount / previousCount) * 100 : 0}%`,
-                                }}
+                                style={{ width: `${progressWidth}%` }}
                               />
                             </div>
                             {dropOff > 0 && index < funnelDetails.steps.length - 1 && (
-                              <div className="text-xs text-gray-500 ml-11">
-                                {dropOff.toLocaleString()} users dropped off
+                              <div className="text-xs text-gray-500">
+                                ↓ {dropOff.toLocaleString()} users dropped off
                               </div>
                             )}
                           </div>

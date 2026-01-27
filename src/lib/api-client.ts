@@ -39,8 +39,25 @@ export async function login(email: string, password: string): Promise<string> {
     throw new Error(errorMessage);
   }
 
-  const data: SuccessResponse<{ token: string }> = await response.json();
-  return data.data.token;
+  const data = await response.json();
+  
+  // Extract token from response (handle wrapped and unwrapped)
+  let token: string | undefined;
+  if (data && typeof data === 'object') {
+    if ('data' in data && data.data?.token) {
+      token = data.data.token;
+    } else if ('token' in data) {
+      token = data.token;
+    }
+  }
+  
+  // Validate token
+  if (!token || typeof token !== 'string' || token.trim() === '') {
+    console.error('Invalid token received from login:', data);
+    throw new Error('Invalid authentication response from server');
+  }
+  
+  return token;
 }
 
 export async function register(
@@ -66,11 +83,6 @@ export async function register(
     const errorMessage = await parseErrorResponse(response);
     throw new Error(errorMessage);
   }
-
-  // Register returns 201 with null data
-  if (response.status !== 201) {
-    throw new Error('Registration failed');
-  }
 }
 
 export async function activateAccount(token: string): Promise<void> {
@@ -85,31 +97,45 @@ export async function activateAccount(token: string): Promise<void> {
     const errorMessage = await parseErrorResponse(response);
     throw new Error(errorMessage);
   }
-
-  // Activation returns 204 No Content
-  if (response.status !== 204) {
-    throw new Error('Activation failed');
-  }
 }
 
 // ==================== Projects ====================
 
 export interface Project {
   id: string;
-  owner_id: string;
   name: string;
-  slug: string;
-  description: string;
-  status: 'active' | 'suspended' | 'archived';
-  settings: Record<string, any>;
+  description?: string;
   created_at: string;
   updated_at: string;
-  deleted_at: string | null;
+  is_archived: boolean;
 }
 
-export async function getProjects(includeArchived: boolean = false): Promise<Project[]> {
-  const query = includeArchived ? '?include_archived=true' : '';
-  const response = await fetch(`${API_URL}/v1/projects${query}`, {
+export interface ProjectOverview {
+  project: Project;
+  // Real-time metrics
+  active_users_5m: number;
+  dau: number;
+  wau: number;
+  mau: number;
+  // Period metrics
+  events: number;
+  sessions: number;
+  new_users: number;
+  // Top events
+  top_events: Array<{
+    event_type: string;
+    count: number;
+  }>;
+  // Funnel previews
+  funnels_previews: Array<{
+    id: string;
+    name: string;
+    conversion_rate: number;
+  }>;
+}
+
+export async function getProjects(): Promise<Project[]> {
+  const response = await fetch(`${API_URL}/v1/projects`, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -119,15 +145,19 @@ export async function getProjects(includeArchived: boolean = false): Promise<Pro
     throw new Error(errorMessage);
   }
 
-  const data: SuccessResponse<Project[]> = await response.json();
-  return data.data || [];
+  const data = await response.json();
+  if (data && typeof data === 'object' && 'data' in data) {
+    return data.data || [];
+  }
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return [];
 }
 
 export async function createProject(
   name: string,
-  slug: string,
-  description?: string,
-  settings?: Record<string, any>
+  description?: string
 ): Promise<Project> {
   const response = await fetch(`${API_URL}/v1/projects`, {
     method: 'POST',
@@ -137,9 +167,7 @@ export async function createProject(
     },
     body: JSON.stringify({
       name,
-      slug,
       description: description || '',
-      settings: settings || {},
     }),
   });
 
@@ -148,8 +176,11 @@ export async function createProject(
     throw new Error(errorMessage);
   }
 
-  const data: SuccessResponse<Project> = await response.json();
-  return data.data;
+  const data = await response.json();
+  if (data && typeof data === 'object' && 'data' in data) {
+    return data.data;
+  }
+  return data;
 }
 
 export async function updateProject(
@@ -157,9 +188,6 @@ export async function updateProject(
   updates: {
     name?: string;
     description?: string;
-    slug?: string;
-    status?: 'active' | 'suspended' | 'archived';
-    settings?: Record<string, any>;
   }
 ): Promise<Project> {
   const response = await fetch(`${API_URL}/v1/projects/${projectId}`, {
@@ -176,8 +204,11 @@ export async function updateProject(
     throw new Error(errorMessage);
   }
 
-  const data: SuccessResponse<Project> = await response.json();
-  return data.data;
+  const data = await response.json();
+  if (data && typeof data === 'object' && 'data' in data) {
+    return data.data;
+  }
+  return data;
 }
 
 export async function archiveProject(projectId: string): Promise<void> {
@@ -189,28 +220,6 @@ export async function archiveProject(projectId: string): Promise<void> {
   if (!response.ok) {
     const errorMessage = await parseErrorResponse(response);
     throw new Error(errorMessage);
-  }
-
-  // Archive returns 204 No Content
-  if (response.status !== 204) {
-    throw new Error('Archive failed');
-  }
-}
-
-export async function unarchiveProject(projectId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/v1/projects/${projectId}/unarchive`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    const errorMessage = await parseErrorResponse(response);
-    throw new Error(errorMessage);
-  }
-
-  // Unarchive returns 204 No Content
-  if (response.status !== 204) {
-    throw new Error('Unarchive failed');
   }
 }
 
@@ -224,23 +233,23 @@ export async function deleteProject(projectId: string): Promise<void> {
     const errorMessage = await parseErrorResponse(response);
     throw new Error(errorMessage);
   }
-
-  // Delete returns 204 No Content
-  if (response.status !== 204) {
-    throw new Error('Delete failed');
-  }
 }
 
 export async function getProjectOverview(
   projectId: string,
   startDate?: string,
   endDate?: string
-): Promise<{ overview: any }> {
+): Promise<ProjectOverview> {
   const params = new URLSearchParams();
   if (startDate) params.append('start_date', startDate);
   if (endDate) params.append('end_date', endDate);
 
-  const response = await fetch(`${API_URL}/v1/projects/${projectId}/overview?${params}`, {
+  const queryString = params.toString();
+  const url = queryString 
+    ? `${API_URL}/v1/projects/${projectId}/overview?${queryString}`
+    : `${API_URL}/v1/projects/${projectId}/overview`;
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -250,11 +259,43 @@ export async function getProjectOverview(
     throw new Error(errorMessage);
   }
 
-  const data: SuccessResponse<{ overview: any }> = await response.json();
-  return data.data;
+  const data = await response.json();
+  // Backend returns { data: { overview: { ... } } }
+  if (data && typeof data === 'object') {
+    if ('data' in data && data.data?.overview) {
+      return data.data.overview;
+    }
+    if ('data' in data) {
+      return data.data;
+    }
+    if ('overview' in data) {
+      return data.overview;
+    }
+  }
+  return data;
 }
 
 // ==================== Events ====================
+
+export interface Event {
+  id: string;
+  event_type: string;
+  occurred_at: string;
+  properties: Record<string, any>;
+  session_id?: string;
+  user_id?: string;
+}
+
+export interface PaginationMetadata {
+  has_more: boolean;
+  limit: number;
+  offset: number;
+}
+
+export interface EventsListResponse {
+  events: Event[];
+  pagination: PaginationMetadata;
+}
 
 export async function getEvents(
   projectId: string,
@@ -267,7 +308,7 @@ export async function getEvents(
     limit?: number;
     offset?: number;
   }
-) {
+): Promise<EventsListResponse> {
   const params = new URLSearchParams();
   if (options?.startDate) params.append('start_date', options.startDate);
   if (options?.endDate) params.append('end_date', options.endDate);
@@ -275,7 +316,7 @@ export async function getEvents(
   if (options?.anonymousId) params.append('anonymous_id', options.anonymousId);
   if (options?.externalUserId) params.append('external_user_id', options.externalUserId);
   if (options?.limit) params.append('limit', options.limit.toString());
-  if (options?.offset) params.append('offset', options.offset.toString());
+  if (options?.offset !== undefined) params.append('offset', options.offset.toString());
 
   const response = await fetch(`${API_URL}/v1/projects/${projectId}/events?${params}`, {
     method: 'GET',
@@ -287,25 +328,43 @@ export async function getEvents(
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const json = await response.json();
+  // Response is wrapped: { data: { events: [], pagination: {} } }
+  if (json && typeof json === 'object' && 'data' in json) {
+    return {
+      events: json.data.events || [],
+      pagination: json.data.pagination || { has_more: false, limit: 20, offset: 0 },
+    };
+  }
+  return json;
 }
 
 // ==================== Users ====================
 
+export interface AppUser {
+  id: string;
+  project_id: string;
+  external_user_id: string;
+  traits: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UsersListResponse {
+  users: AppUser[];
+  has_more: boolean;
+}
+
 export async function getUsers(
   projectId: string,
   options?: {
-    startDate?: string;
-    endDate?: string;
+    page?: number;
     limit?: number;
-    offset?: number;
   }
-) {
+): Promise<UsersListResponse> {
   const params = new URLSearchParams();
-  if (options?.startDate) params.append('start_date', options.startDate);
-  if (options?.endDate) params.append('end_date', options.endDate);
+  if (options?.page) params.append('page', options.page.toString());
   if (options?.limit) params.append('limit', options.limit.toString());
-  if (options?.offset) params.append('offset', options.offset.toString());
 
   const response = await fetch(`${API_URL}/v1/projects/${projectId}/users?${params}`, {
     method: 'GET',
@@ -317,15 +376,19 @@ export async function getUsers(
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const json = await response.json();
+  // Response is wrapped: { data: { users: [], has_more: bool } }
+  if (json && typeof json === 'object' && 'data' in json) {
+    return {
+      users: json.data.users || [],
+      has_more: json.data.has_more || false,
+    };
+  }
+  return json;
 }
 
-export async function getUserSummary(projectId: string, externalUserId: string, startDate?: string, endDate?: string) {
-  const params = new URLSearchParams();
-  if (startDate) params.append('start_date', startDate);
-  if (endDate) params.append('end_date', endDate);
-
-  const response = await fetch(`${API_URL}/v1/projects/${projectId}/users/${externalUserId}/summary?${params}`, {
+export async function getUserDetails(projectId: string, userId: string): Promise<AppUser> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/users/${userId}`, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -335,7 +398,58 @@ export async function getUserSummary(projectId: string, externalUserId: string, 
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const json = await response.json();
+  // Response is wrapped: { data: { user: {} } }
+  if (json && typeof json === 'object' && 'data' in json) {
+    return json.data.user || json.data;
+  }
+  return json;
+}
+
+export interface UserSummary {
+  total_events: number;
+  first_seen: string; // ISO string
+  last_seen: string; // ISO string
+  event_types: string[];
+  event_counts_by_type: Record<string, number>;
+}
+
+export async function getUserSummary(projectId: string, userId: string): Promise<UserSummary> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/users/${userId}/summary`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  const json = await response.json();
+  // Response is wrapped: { data: { summary: {} } }
+  if (json && typeof json === 'object' && 'data' in json) {
+    return json.data.summary;
+  }
+  return json;
+}
+
+export interface UserJourneyEvent {
+  event_id: string;
+  event_type: string;
+  occurred_at: string;
+  properties: Record<string, any>;
+  session_id: string;
+}
+
+export interface UserJourney {
+  user: AppUser;
+  events: UserJourneyEvent[];
+  summary: {
+    total_events: number;
+    first_seen: string;
+    last_seen: string;
+    event_types: string[];
+  };
 }
 
 export async function getUserJourney(
@@ -344,15 +458,11 @@ export async function getUserJourney(
   options?: {
     startDate?: string;
     endDate?: string;
-    limit?: number;
-    offset?: number;
   }
-) {
+): Promise<UserJourney> {
   const params = new URLSearchParams();
   if (options?.startDate) params.append('start_date', options.startDate);
   if (options?.endDate) params.append('end_date', options.endDate);
-  if (options?.limit) params.append('limit', options.limit.toString());
-  if (options?.offset) params.append('offset', options.offset.toString());
 
   const response = await fetch(`${API_URL}/v1/projects/${projectId}/users/${userId}/journey?${params}`, {
     method: 'GET',
@@ -364,27 +474,45 @@ export async function getUserJourney(
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const data = await response.json();
+  if (data && typeof data === 'object' && 'data' in data) {
+    return data.data;
+  }
+  return data;
 }
 
 // ==================== Funnels ====================
 
-export async function getFunnels(
-  projectId: string,
-  options?: {
-    startDate?: string;
-    endDate?: string;
-    limit?: number;
-    offset?: number;
-  }
-) {
-  const params = new URLSearchParams();
-  if (options?.startDate) params.append('start_date', options.startDate);
-  if (options?.endDate) params.append('end_date', options.endDate);
-  if (options?.limit) params.append('limit', options.limit.toString());
-  if (options?.offset) params.append('offset', options.offset.toString());
+export interface FunnelStep {
+  id: string;
+  event_type_id: string;
+  event_type_name: string;
+  step_order: number;
+}
 
-  const response = await fetch(`${API_URL}/v1/projects/${projectId}/funnels?${params}`, {
+export interface Funnel {
+  id: string;
+  name: string;
+  description?: string;
+  project_id: string;
+  steps: FunnelStep[];
+  created_at: string;
+}
+
+export interface FunnelAnalyticsStep {
+  order: number;
+  event_type: string;
+  users: number;
+}
+
+export interface FunnelAnalytics {
+  started: number;
+  completed: number;
+  steps: FunnelAnalyticsStep[];
+}
+
+export async function getFunnels(projectId: string): Promise<Funnel[]> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/funnels`, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -394,15 +522,65 @@ export async function getFunnels(
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const json = await response.json();
+  // Response is wrapped: { data: { funnels: [] } }
+  if (json && typeof json === 'object' && 'data' in json) {
+    return json.data.funnels || json.data || [];
+  }
+  if (Array.isArray(json)) {
+    return json;
+  }
+  return [];
 }
 
-export async function getFunnelDetails(projectId: string, funnelId: string, startDate?: string, endDate?: string) {
+export async function createFunnel(
+  projectId: string,
+  name: string,
+  steps: Array<{ event_type_id: string }>,
+  description?: string
+): Promise<Funnel> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/funnels`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name,
+      description,
+      steps,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  if (data && typeof data === 'object' && 'data' in data) {
+    return data.data;
+  }
+  return data;
+}
+
+export async function getFunnelAnalytics(
+  projectId: string,
+  funnelId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<FunnelAnalytics> {
   const params = new URLSearchParams();
   if (startDate) params.append('start_date', startDate);
   if (endDate) params.append('end_date', endDate);
 
-  const response = await fetch(`${API_URL}/v1/projects/${projectId}/funnels/${funnelId}/details?${params}`, {
+  const queryString = params.toString();
+  // Use /details endpoint for analytics with user counts and conversion rates
+  const url = queryString
+    ? `${API_URL}/v1/projects/${projectId}/funnels/${funnelId}/details?${queryString}`
+    : `${API_URL}/v1/projects/${projectId}/funnels/${funnelId}/details`;
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -412,17 +590,98 @@ export async function getFunnelDetails(projectId: string, funnelId: string, star
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const data = await response.json();
+  // Response is wrapped in data.funnel
+  if (data && typeof data === 'object') {
+    if ('data' in data && data.data?.funnel) {
+      return data.data.funnel;
+    }
+    if ('funnel' in data) {
+      return data.funnel;
+    }
+  }
+  return data;
+}
+
+export async function updateFunnel(
+  projectId: string,
+  funnelId: string,
+  updates: {
+    name?: string;
+    description?: string;
+    steps?: Array<{ event_type_id: string }>;
+  }
+): Promise<Funnel> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/funnels/${funnelId}`, {
+    method: 'PUT',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  if (data && typeof data === 'object' && 'data' in data) {
+    return data.data;
+  }
+  return data;
+}
+
+export async function deleteFunnel(projectId: string, funnelId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/funnels/${funnelId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
 }
 
 // ==================== Journeys ====================
+
+export interface EventTypeDropOff {
+  event_type: string;
+  users_reached: number;
+  users_continued: number;
+  users_dropped_off: number;
+  drop_off_rate: number;
+  average_time_after: number;
+}
+
+export interface LastEventStat {
+  event_type: string;
+  count: number;
+  percentage: number;
+  average_position: number;
+}
+
+export interface JourneyDropOffAnalysis {
+  total_users_analyzed: number;
+  average_journey_length: number;
+  median_journey_length: number;
+  common_last_events: LastEventStat[];
+  drop_off_by_event_type: EventTypeDropOff[];
+  average_time_to_drop_off: number;
+  period?: {
+    start_date: string;
+    end_date: string;
+  };
+}
 
 export async function getJourneyDropOffAnalysis(
   projectId: string,
   startDate: string,
   endDate: string,
   limit?: number
-) {
+): Promise<JourneyDropOffAnalysis> {
   const params = new URLSearchParams();
   params.append('start_date', startDate);
   params.append('end_date', endDate);
@@ -438,7 +697,57 @@ export async function getJourneyDropOffAnalysis(
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const data = await response.json();
+  // Response is wrapped in data.analysis
+  if (data && typeof data === 'object') {
+    if ('data' in data && data.data?.analysis) {
+      return data.data.analysis;
+    }
+    if ('analysis' in data) {
+      return data.analysis;
+    }
+  }
+  return data;
+}
+
+// ==================== Entity Insights ====================
+
+export interface EntityInsights {
+  entity_id: string;
+  project_id: string;
+  impressions_count: number;
+  views_count: number;
+  clicks_count: number;
+  likes_count: number;
+  shares_count: number;
+  comments_count: number;
+  saves_count: number;
+  dismiss_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  last_viewed_at: string;
+  last_clicked_at: string;
+}
+
+export async function getEntityInsights(
+  projectId: string,
+  entityId: string
+): Promise<EntityInsights> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/entity/${entityId}/insights`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  if (data && typeof data === 'object' && 'data' in data) {
+    return data.data;
+  }
+  return data;
 }
 
 // ==================== Analytics ====================
@@ -456,7 +765,7 @@ export async function getTimeSeries(
   params.append('start_date', startDate);
   params.append('end_date', endDate);
 
-  const response = await fetch(`${API_URL}/v1/projects/${projectId}/analytics/time-series?${params}`, {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/analytics/timeseries?${params}`, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -697,7 +1006,8 @@ export interface EventType {
   project_id: string;
   event_name: string;
   taxonomy_id: string;
-  custom_weight?: number;
+  status: 'draft' | 'active' | 'deprecated' | 'blocked';
+  source: 'sdk' | 'ui';
   description?: string;
   created_at?: string;
 }
@@ -730,17 +1040,18 @@ export async function createEventType(
   projectId: string,
   eventName: string,
   taxonomyId: string,
-  customWeight?: number,
   description?: string
 ): Promise<EventType> {
   const response = await fetch(`${API_URL}/v1/events/types`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({
       project_id: projectId,
       event_name: eventName,
       taxonomy_id: taxonomyId,
-      custom_weight: customWeight,
       description: description,
     }),
   });

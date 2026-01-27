@@ -1,16 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Key, Plus, Trash2, Copy, Check, AlertCircle, FolderOpen, Edit2, Archive, ArchiveRestore, X, Loader2 } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, Check, AlertCircle, FolderOpen, Edit2, Archive, X, Loader2 } from 'lucide-react';
 import { 
   getAPIKeys, 
   revokeAPIKey, 
   APIKey,
   getProjects,
-  getProjectOverview,
   updateProject,
   archiveProject,
-  unarchiveProject,
   deleteProject,
   Project
 } from '@/lib/api-client';
@@ -36,7 +34,7 @@ export default function SettingsPage() {
   const [isArchiving, setIsArchiving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const isDeletingRef = useRef(false); // Track deletion in progress to prevent flickering
+  const isDeletingRef = useRef(false);
   
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -65,7 +63,6 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    // Skip if we're in the middle of deleting to prevent flickering
     if (isDeletingRef.current) return;
     
     const loadAPIKeys = async () => {
@@ -88,13 +85,11 @@ export default function SettingsPage() {
     };
 
     loadAPIKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId]);
 
   // Load current project details
   const loadCurrentProject = async () => {
     if (!selectedProjectId) {
-      // Immediately clear state without loading
       setCurrentProject(null);
       setIsLoadingProject(false);
       return;
@@ -102,11 +97,9 @@ export default function SettingsPage() {
 
     try {
       setIsLoadingProject(true);
-      const projects = await getProjects(true); // Include archived
+      const projects = await getProjects();
       const project = projects.find(p => p.id === selectedProjectId);
       
-      // If project not found, clear project but don't change selectedProjectId here
-      // (let the parent handle that to avoid flickering)
       if (!project) {
         setCurrentProject(null);
         setIsLoadingProject(false);
@@ -123,17 +116,14 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    // Skip if we're in the middle of deleting to prevent flickering
     if (isDeletingRef.current) return;
-    
     loadCurrentProject();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId]);
 
   // Load all projects for management
   const loadAllProjects = async () => {
     try {
-      const projects = await getProjects(true); // Include archived
+      const projects = await getProjects();
       setAllProjects(projects);
     } catch (error: any) {
       toast.error(error.message || 'Failed to load projects');
@@ -160,7 +150,6 @@ export default function SettingsPage() {
           setRevokingId(keyId);
           await revokeAPIKey(selectedProjectId, keyId);
           toast.success('API key revoked successfully');
-          // Reload keys
           const keys = await getAPIKeys(selectedProjectId);
           setAPIKeys(keys);
           setConfirmDialog({ 
@@ -179,7 +168,6 @@ export default function SettingsPage() {
   };
 
   const handleKeyCreated = () => {
-    // Reload keys after creation
     if (selectedProjectId) {
       getAPIKeys(selectedProjectId).then(setAPIKeys).catch(() => {});
     }
@@ -192,7 +180,7 @@ export default function SettingsPage() {
     setConfirmDialog({
       isOpen: true,
       title: 'Archive Project',
-      message: `Are you sure you want to archive "${currentProject.name}"? You can unarchive it later.`,
+      message: `Are you sure you want to archive "${currentProject.name}"?`,
       confirmText: 'Archive',
       variant: 'warning',
       onConfirm: async () => {
@@ -201,10 +189,10 @@ export default function SettingsPage() {
           await archiveProject(selectedProjectId);
           toast.success('Project archived successfully');
           await loadAllProjects();
-          // If project was archived, switch to first active project
-          const updatedProjects = await getProjects(false); // Get active projects
-          if (updatedProjects.length > 0) {
-            setSelectedProjectId(updatedProjects[0].id);
+          const updatedProjects = await getProjects();
+          const activeProjects = updatedProjects.filter(p => !p.is_archived);
+          if (activeProjects.length > 0) {
+            setSelectedProjectId(activeProjects[0].id);
           } else {
             setSelectedProjectId(null);
           }
@@ -224,78 +212,48 @@ export default function SettingsPage() {
     });
   };
 
-  const handleUnarchive = async () => {
-    if (!selectedProjectId || !currentProject) return;
-
-    try {
-      setIsArchiving(true);
-      await unarchiveProject(selectedProjectId);
-      toast.success('Project unarchived successfully');
-      await loadCurrentProject();
-      await loadAllProjects();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to unarchive project');
-    } finally {
-      setIsArchiving(false);
-    }
-  };
-
   const handleDelete = async () => {
     if (!selectedProjectId || !currentProject) return;
     
     const projectName = currentProject.name;
     
-    // Show delete confirmation dialog that requires typing the project name
     setDeleteDialog({
       isOpen: true,
       projectName: projectName,
       onConfirm: async () => {
         try {
           setIsDeleting(true);
-          isDeletingRef.current = true; // Set flag to prevent useEffects from firing
+          isDeletingRef.current = true;
           
           await deleteProject(selectedProjectId);
           toast.success('Project deleted successfully');
           
-          // Get updated projects first
-          const updatedProjects = await getProjects(false);
+          const updatedProjects = await getProjects();
+          const activeProjects = updatedProjects.filter(p => !p.is_archived);
           
-          // Batch all state updates together to prevent flickering
-          if (updatedProjects.length > 0) {
-            // Switch to first active project - batch all updates
-            const newProjectId = updatedProjects[0].id;
-            // Clear old data first, then set new project
+          if (activeProjects.length > 0) {
+            const newProjectId = activeProjects[0].id;
             setCurrentProject(null);
             setAPIKeys([]);
             setIsLoadingProject(true);
             setSelectedProjectId(newProjectId);
             
-            // Allow useEffects to run after a brief delay to ensure state is batched
-            // This prevents flickering by letting React batch all updates first
             requestAnimationFrame(() => {
               isDeletingRef.current = false;
             });
           } else {
-            // No projects left - clear everything in one batch
             setSelectedProjectId(null);
             setCurrentProject(null);
             setAPIKeys([]);
             setIsLoadingProject(false);
             
-            // Allow useEffects to run after state is cleared
             requestAnimationFrame(() => {
               isDeletingRef.current = false;
             });
           }
           
-          // Reload all projects list
           await loadAllProjects();
           
-          // Force a small delay to ensure ProjectSelector refreshes
-          // This gives React time to process the state updates
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // Close dialog
           setDeleteDialog({
             isOpen: false,
             projectName: '',
@@ -303,7 +261,7 @@ export default function SettingsPage() {
           });
         } catch (error: any) {
           toast.error(error.message || 'Failed to delete project');
-          isDeletingRef.current = false; // Reset flag on error
+          isDeletingRef.current = false;
         } finally {
           setIsDeleting(false);
         }
@@ -314,13 +272,11 @@ export default function SettingsPage() {
   if (!selectedProjectId) {
     return (
       <div className="space-y-8">
-        {/* Header */}
         <div>
           <h1 className="text-3xl font-bold mb-2">Settings</h1>
           <p className="text-gray-400">Manage your account and project settings</p>
         </div>
 
-        {/* No Project Selected State */}
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-12 text-center">
           <p className="text-gray-400 mb-2">No project selected</p>
           <p className="text-sm text-gray-500">Please select a project from the dropdown above to manage settings</p>
@@ -331,7 +287,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold mb-2">Settings</h1>
         <p className="text-gray-400">Manage your account and project settings</p>
@@ -369,18 +324,15 @@ export default function SettingsPage() {
                     <span className="font-semibold text-lg">{currentProject.name}</span>
                     <span
                       className={`px-2 py-1 text-xs rounded ${
-                        currentProject.status === 'active'
+                        !currentProject.is_archived
                           ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                          : currentProject.status === 'archived'
-                          ? 'bg-white/10 text-gray-400 border border-white/20'
-                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                          : 'bg-white/10 text-gray-400 border border-white/20'
                       }`}
                     >
-                      {currentProject.status}
+                      {currentProject.is_archived ? 'Archived' : 'Active'}
                     </span>
                   </div>
                   <div className="text-sm text-gray-400 space-y-1">
-                    <div>Slug: <span className="font-mono text-xs">{currentProject.slug}</span></div>
                     {currentProject.description && (
                       <div>Description: {currentProject.description}</div>
                     )}
@@ -399,25 +351,7 @@ export default function SettingsPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-white/10">
-                {currentProject.status === 'archived' ? (
-                  <button
-                    onClick={handleUnarchive}
-                    disabled={isArchiving}
-                    className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white hover:bg-white/20 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
-                  >
-                    {isArchiving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Unarchiving...
-                      </>
-                    ) : (
-                      <>
-                        <ArchiveRestore className="w-4 h-4" />
-                        Unarchive Project
-                      </>
-                    )}
-                  </button>
-                ) : (
+                {!currentProject.is_archived && (
                   <button
                     onClick={handleArchive}
                     disabled={isArchiving}
@@ -461,10 +395,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">All Projects</h3>
                 <button
-                  onClick={() => {
-                    setShowArchived(!showArchived);
-                    loadAllProjects();
-                  }}
+                  onClick={() => setShowArchived(!showArchived)}
                   className="text-sm text-gray-400 hover:text-white transition-all cursor-pointer"
                 >
                   {showArchived ? 'Hide Archived' : 'Show Archived'}
@@ -472,7 +403,7 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {allProjects
-                  .filter(p => showArchived || p.status === 'active')
+                  .filter(p => showArchived || !p.is_archived)
                   .map((project) => (
                     <div
                       key={project.id}
@@ -484,24 +415,23 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className={`w-2 h-2 rounded-full ${
-                            project.status === 'active' ? 'bg-green-400' : 
-                            project.status === 'archived' ? 'bg-gray-400' : 'bg-red-400'
+                            !project.is_archived ? 'bg-green-400' : 'bg-gray-400'
                           }`}></div>
                           <div>
                             <div className="font-medium">{project.name}</div>
-                            <div className="text-xs text-gray-500">{project.slug}</div>
+                            {project.description && (
+                              <div className="text-xs text-gray-500">{project.description}</div>
+                            )}
                           </div>
                         </div>
                         <span
                           className={`px-2 py-1 text-xs rounded ${
-                            project.status === 'active'
+                            !project.is_archived
                               ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                              : project.status === 'archived'
-                              ? 'bg-white/10 text-gray-400 border border-white/20'
-                              : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              : 'bg-white/10 text-gray-400 border border-white/20'
                           }`}
                         >
-                          {project.status}
+                          {project.is_archived ? 'Archived' : 'Active'}
                         </span>
                       </div>
                     </div>
@@ -538,9 +468,7 @@ export default function SettingsPage() {
           <div className="text-center py-12">
             <Key className="w-16 h-16 text-gray-500 mx-auto mb-4 opacity-50" />
             <p className="text-gray-400 mb-2">No API keys found</p>
-            <p className="text-sm text-gray-500">
-              Use the button above to create your first API key
-            </p>
+            <p className="text-sm text-gray-500">Create your first API key to start making requests to the Norai API</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -570,22 +498,17 @@ export default function SettingsPage() {
                       {key.last_used_at && (
                         <div>Last used: {new Date(key.last_used_at).toLocaleDateString()}</div>
                       )}
-                      {key.revoked_at && (
-                        <div className="text-red-400">
-                          Revoked: {new Date(key.revoked_at).toLocaleDateString()}
-                        </div>
-                      )}
                     </div>
                   </div>
                   {key.status === 'active' && (
                     <button
                       onClick={() => handleRevoke(key.id)}
                       disabled={revokingId === key.id}
-                      className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Revoke API key"
                     >
                       {revokingId === key.id ? (
-                        <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                        <Loader2 className="w-5 h-5 animate-spin" />
                       ) : (
                         <Trash2 className="w-5 h-5" />
                       )}
@@ -644,18 +567,17 @@ export default function SettingsPage() {
         message={confirmDialog.message}
         confirmText={confirmDialog.confirmText}
         variant={confirmDialog.variant || 'default'}
-        isLoading={isArchiving || revokingId !== null}
+        isLoading={isArchiving || isDeleting || revokingId !== null}
       />
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmDialog
         isOpen={deleteDialog.isOpen}
-        onClose={() => setDeleteDialog({ ...deleteDialog, isOpen: false })}
+        onClose={() => setDeleteDialog({ ...deleteDialog, isOpen: false, projectName: '' })}
         onConfirm={deleteDialog.onConfirm}
-        title="Delete Project"
-        message={`This action cannot be undone. This will permanently delete the project "${deleteDialog.projectName}" and all of its data.`}
+        title="Permanently Delete Project"
+        message={`This action cannot be undone. All data associated with "${deleteDialog.projectName}" will be permanently removed.`}
         confirmText="Delete Forever"
-        cancelText="Cancel"
         itemName={deleteDialog.projectName}
         isLoading={isDeleting}
       />
@@ -676,128 +598,36 @@ function EditProjectModal({
   onSuccess: () => void;
 }) {
   const [name, setName] = useState(project.name);
-  const [slug, setSlug] = useState(project.slug);
   const [description, setDescription] = useState(project.description || '');
   const [isLoading, setIsLoading] = useState(false);
   const [nameError, setNameError] = useState('');
-  const [slugError, setSlugError] = useState('');
 
-  // Validation constants
-  const MIN_NAME_LENGTH = 3;
   const MAX_NAME_LENGTH = 100;
-  const MIN_SLUG_LENGTH = 3;
-  const MAX_SLUG_LENGTH = 50;
 
-  // Validate project name
   const validateName = (value: string): string => {
     const trimmed = value.trim();
-    
     if (trimmed.length === 0) {
       return 'Project name is required';
     }
-    
-    if (trimmed.length < MIN_NAME_LENGTH) {
-      return `Project name must be at least ${MIN_NAME_LENGTH} characters`;
-    }
-    
     if (trimmed.length > MAX_NAME_LENGTH) {
       return `Project name must be no more than ${MAX_NAME_LENGTH} characters`;
     }
-    
-    // Allow letters, numbers, spaces, hyphens, underscores, and common punctuation
-    const validPattern = /^[a-zA-Z0-9\s\-_.,!?()]+$/;
-    if (!validPattern.test(trimmed)) {
-      return 'Project name contains invalid characters. Use letters, numbers, spaces, hyphens, underscores, and basic punctuation only.';
-    }
-    
-    // Check for consecutive spaces
-    if (/\s{2,}/.test(trimmed)) {
-      return 'Project name cannot contain consecutive spaces';
-    }
-    
-    // Check if it starts or ends with space
-    if (value !== trimmed) {
-      return 'Project name cannot start or end with spaces';
-    }
-    
     return '';
   };
-
-  // Validate slug
-  const validateSlug = (value: string): string => {
-    const trimmed = value.trim();
-    
-    if (trimmed.length === 0) {
-      return 'Project slug is required';
-    }
-    
-    if (trimmed.length < MIN_SLUG_LENGTH) {
-      return `Project slug must be at least ${MIN_SLUG_LENGTH} characters`;
-    }
-    
-    if (trimmed.length > MAX_SLUG_LENGTH) {
-      return `Project slug must be no more than ${MAX_SLUG_LENGTH} characters`;
-    }
-    
-    // Must match pattern: lowercase letters, numbers, hyphens only
-    const slugPattern = /^[a-z0-9-]+$/;
-    if (!slugPattern.test(trimmed)) {
-      return 'Slug must contain only lowercase letters, numbers, and hyphens';
-    }
-    
-    // Cannot start or end with hyphen
-    if (trimmed.startsWith('-') || trimmed.endsWith('-')) {
-      return 'Slug cannot start or end with a hyphen';
-    }
-    
-    // Cannot have consecutive hyphens
-    if (trimmed.includes('--')) {
-      return 'Slug cannot contain consecutive hyphens';
-    }
-    
-    return '';
-  };
-
-  const handleNameChange = (value: string) => {
-    setName(value);
-    const error = validateName(value);
-    setNameError(error);
-  };
-
-  const handleSlugChange = (value: string) => {
-    setSlug(value);
-    const error = validateSlug(value);
-    setSlugError(error);
-  };
-
-  // Reset errors when modal opens/closes
-  useEffect(() => {
-    if (isOpen) {
-      setName(project.name);
-      setSlug(project.slug);
-      setDescription(project.description || '');
-      setNameError('');
-      setSlugError('');
-    }
-  }, [isOpen, project]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate before submit
     const nameErr = validateName(name);
-    const slugErr = validateSlug(slug);
-    
     setNameError(nameErr);
-    setSlugError(slugErr);
     
-    if (nameErr || slugErr) {
+    if (nameErr) {
       toast.error('Please fix the errors before submitting');
       return;
     }
     
-    if (!name.trim() || !slug.trim()) {
-      toast.error('Please fill in all required fields');
+    if (!name.trim()) {
+      toast.error('Please enter a project name');
       return;
     }
 
@@ -806,7 +636,6 @@ function EditProjectModal({
     try {
       await updateProject(project.id, {
         name: name.trim(),
-        slug: slug.trim(),
         description: description.trim() || undefined,
       });
       toast.success('Project updated successfully!');
@@ -849,9 +678,11 @@ function EditProjectModal({
               id="edit-name"
               type="text"
               value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameError(validateName(e.target.value));
+              }}
               required
-              minLength={MIN_NAME_LENGTH}
               maxLength={MAX_NAME_LENGTH}
               className={`w-full px-4 py-3 bg-white/5 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:bg-white/10 transition-all cursor-text ${
                 nameError
@@ -859,46 +690,14 @@ function EditProjectModal({
                   : 'border-white/10 focus:border-white/20'
               }`}
             />
-            {nameError ? (
+            {nameError && (
               <p className="mt-1 text-xs text-red-400">{nameError}</p>
-            ) : (
-              <p className="mt-1 text-xs text-gray-500">
-                {name.length > 0 ? `${name.length}/${MAX_NAME_LENGTH} characters` : `Between ${MIN_NAME_LENGTH} and ${MAX_NAME_LENGTH} characters`}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="edit-slug" className="block text-sm font-medium text-gray-300 mb-2">
-              Project Slug <span className="text-red-400">*</span>
-            </label>
-            <input
-              id="edit-slug"
-              type="text"
-              value={slug}
-              onChange={(e) => handleSlugChange(e.target.value)}
-              required
-              minLength={MIN_SLUG_LENGTH}
-              maxLength={MAX_SLUG_LENGTH}
-              pattern="[a-z0-9-]+"
-              className={`w-full px-4 py-3 bg-white/5 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:bg-white/10 transition-all cursor-text font-mono text-sm ${
-                slugError
-                  ? 'border-red-500/50 focus:border-red-500'
-                  : 'border-white/10 focus:border-white/20'
-              }`}
-            />
-            {slugError ? (
-              <p className="mt-1 text-xs text-red-400">{slugError}</p>
-            ) : (
-              <p className="mt-1 text-xs text-gray-500">
-                {slug.length > 0 ? `${slug.length}/${MAX_SLUG_LENGTH} characters` : `Lowercase letters, numbers, and hyphens only (${MIN_SLUG_LENGTH}-${MAX_SLUG_LENGTH} characters)`}
-              </p>
             )}
           </div>
 
           <div>
             <label htmlFor="edit-description" className="block text-sm font-medium text-gray-300 mb-2">
-              Description
+              Description (Optional)
             </label>
             <textarea
               id="edit-description"
@@ -906,6 +705,7 @@ function EditProjectModal({
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-white/20 focus:bg-white/10 transition-all cursor-text resize-none"
+              placeholder="Describe your project..."
             />
           </div>
 
@@ -919,7 +719,7 @@ function EditProjectModal({
             </button>
             <button
               type="submit"
-              disabled={isLoading || !name.trim() || !slug.trim() || !!nameError || !!slugError}
+              disabled={isLoading || !name.trim() || !!nameError}
               className="flex-1 px-4 py-3 bg-white text-black rounded-lg hover:bg-gray-200 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
             >
               {isLoading ? (

@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Map, Calendar, TrendingDown, AlertCircle } from 'lucide-react';
-import { getJourneyDropOffAnalysis } from '@/lib/api-client';
+import { Map, Calendar, TrendingDown, AlertCircle, Users, Clock } from 'lucide-react';
+import { getJourneyDropOffAnalysis, JourneyDropOffAnalysis } from '@/lib/api-client';
 import { useDashboard } from '@/contexts/DashboardContext';
 import { toast } from 'sonner';
 import DatePicker from '@/components/ui/date-picker';
 
 export default function JourneysPage() {
   const { selectedProjectId } = useDashboard();
-  const [dropOffAnalysis, setDropOffAnalysis] = useState<any[]>([]);
+  const [analysis, setAnalysis] = useState<JourneyDropOffAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
   // Default to last 30 days (ending yesterday to avoid future date issues)
@@ -37,28 +37,13 @@ export default function JourneysPage() {
         const response = await getJourneyDropOffAnalysis(
           selectedProjectId,
           startDate,
-          endDate
+          endDate,
+          10 // limit
         );
-
-        // Handle both wrapped and unwrapped responses
-        let analysisData: any[] = [];
-
-        if (Array.isArray(response)) {
-          analysisData = response;
-        } else if (response && typeof response === 'object') {
-          // Try different possible response structures
-          analysisData = response.data || response.analysis || response.drop_offs || [];
-        }
-
-        // Ensure analysisData is always an array
-        if (!Array.isArray(analysisData)) {
-          analysisData = [];
-        }
-
-        setDropOffAnalysis(analysisData);
+        setAnalysis(response);
       } catch (error: any) {
         toast.error(error.message || 'Failed to load journey analysis');
-        setDropOffAnalysis([]);
+        setAnalysis(null);
       } finally {
         setIsLoading(false);
       }
@@ -104,35 +89,74 @@ export default function JourneysPage() {
         </div>
       </div>
 
-      {/* Drop-off Analysis */}
+      {/* Overview Stats */}
+      {analysis && analysis.total_users_analyzed > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Users className="w-5 h-5 text-gray-400" />
+              <span className="text-sm text-gray-400">Users Analyzed</span>
+            </div>
+            <div className="text-2xl font-bold">{analysis.total_users_analyzed.toLocaleString()}</div>
+          </div>
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <TrendingDown className="w-5 h-5 text-gray-400" />
+              <span className="text-sm text-gray-400">Avg Journey Length</span>
+            </div>
+            <div className="text-2xl font-bold">{analysis.average_journey_length.toFixed(1)} events</div>
+          </div>
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Map className="w-5 h-5 text-gray-400" />
+              <span className="text-sm text-gray-400">Median Journey</span>
+            </div>
+            <div className="text-2xl font-bold">{analysis.median_journey_length} events</div>
+          </div>
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Clock className="w-5 h-5 text-gray-400" />
+              <span className="text-sm text-gray-400">Avg Time to Drop-off</span>
+            </div>
+            <div className="text-2xl font-bold">
+              {analysis.average_time_to_drop_off > 3600 
+                ? `${(analysis.average_time_to_drop_off / 3600).toFixed(1)}h`
+                : analysis.average_time_to_drop_off > 60
+                  ? `${(analysis.average_time_to_drop_off / 60).toFixed(1)}m`
+                  : `${analysis.average_time_to_drop_off.toFixed(0)}s`
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drop-off by Event Type */}
       <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
         <div className="flex items-center gap-3 mb-6">
           <TrendingDown className="w-5 h-5 text-gray-400" />
-          <h2 className="text-lg font-semibold">Drop-off Analysis</h2>
+          <h2 className="text-lg font-semibold">Drop-off by Event Type</h2>
         </div>
 
         {isLoading ? (
           <div className="text-center py-12">
             <div className="text-gray-400">Loading analysis...</div>
           </div>
-        ) : !Array.isArray(dropOffAnalysis) || dropOffAnalysis.length === 0 ? (
+        ) : !analysis || !analysis.drop_off_by_event_type || analysis.drop_off_by_event_type.length === 0 ? (
           <div className="text-center py-12">
             <Map className="w-16 h-16 text-gray-500 mx-auto mb-4 opacity-50" />
             <p className="text-gray-400 mb-2">No drop-off data available</p>
             <p className="text-sm text-gray-500">
-              Drop-off analysis will appear here once you have sufficient journey data
+              Drop-off analysis requires tracked events. Start tracking events with the SDK to see where users drop off.
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {Array.isArray(dropOffAnalysis) && dropOffAnalysis.map((dropOff, index) => {
-              const dropOffRate = dropOff.total_users > 0
-                ? ((dropOff.drop_off_count / dropOff.total_users) * 100).toFixed(1)
-                : '0';
+            {analysis.drop_off_by_event_type.map((dropOff, index) => {
+              const dropOffRate = (dropOff.drop_off_rate * 100).toFixed(1);
 
               return (
                 <div
-                  key={dropOff.event_type || dropOff.step_id || index}
+                  key={dropOff.event_type || index}
                   className="bg-white/5 border border-white/10 rounded-lg p-6 hover:bg-white/10 transition-all"
                 >
                   <div className="flex items-start justify-between mb-4">
@@ -141,11 +165,14 @@ export default function JourneysPage() {
                         <AlertCircle className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <div className="font-semibold">
-                          {dropOff.event_type || dropOff.step_name || `Step ${index + 1}`}
-                        </div>
-                        {dropOff.description && (
-                          <div className="text-sm text-gray-500 mt-1">{dropOff.description}</div>
+                        <div className="font-semibold">{dropOff.event_type}</div>
+                        {dropOff.average_time_after > 0 && (
+                          <div className="text-sm text-gray-500 mt-1">
+                            Avg time to next event: {dropOff.average_time_after > 60 
+                              ? `${(dropOff.average_time_after / 60).toFixed(1)}m`
+                              : `${dropOff.average_time_after.toFixed(0)}s`
+                            }
+                          </div>
                         )}
                       </div>
                     </div>
@@ -157,56 +184,76 @@ export default function JourneysPage() {
 
                   <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/10">
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">Total Users</div>
+                      <div className="text-xs text-gray-500 mb-1">Users Reached</div>
                       <div className="text-lg font-semibold">
-                        {dropOff.total_users?.toLocaleString() || '0'}
+                        {dropOff.users_reached.toLocaleString()}
                       </div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Dropped Off</div>
                       <div className="text-lg font-semibold text-red-400">
-                        {dropOff.drop_off_count?.toLocaleString() || '0'}
+                        {dropOff.users_dropped_off.toLocaleString()}
                       </div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Continued</div>
                       <div className="text-lg font-semibold text-green-400">
-                        {((dropOff.total_users || 0) - (dropOff.drop_off_count || 0)).toLocaleString()}
+                        {dropOff.users_continued.toLocaleString()}
                       </div>
                     </div>
                   </div>
 
                   {/* Progress Bar */}
                   <div className="mt-4">
-                    <div className="w-full bg-white/5 rounded-full h-3">
+                    <div className="w-full bg-white/5 rounded-full h-3 overflow-hidden">
                       <div
                         className="bg-red-400 h-3 rounded-full transition-all"
-                        style={{
-                          width: `${dropOffRate}%`,
-                        }}
+                        style={{ width: `${Math.min(100, parseFloat(dropOffRate))}%` }}
                       />
                     </div>
                   </div>
-
-                  {dropOff.recommendations && dropOff.recommendations.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-white/10">
-                      <div className="text-xs text-gray-500 mb-2">Recommendations</div>
-                      <ul className="space-y-1">
-                        {dropOff.recommendations.map((rec: string, recIndex: number) => (
-                          <li key={recIndex} className="text-sm text-gray-400 flex items-start gap-2">
-                            <span className="text-gray-500">•</span>
-                            <span>{rec}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Common Last Events */}
+      {analysis && analysis.common_last_events && analysis.common_last_events.length > 0 && (
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <AlertCircle className="w-5 h-5 text-gray-400" />
+            <h2 className="text-lg font-semibold">Common Exit Points</h2>
+            <span className="text-sm text-gray-500">Where users most commonly end their journey</span>
+          </div>
+
+          <div className="space-y-3">
+            {analysis.common_last_events.map((lastEvent, index) => (
+              <div
+                key={lastEvent.event_type || index}
+                className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-sm font-bold">
+                    {index + 1}
+                  </div>
+                  <div>
+                    <div className="font-medium">{lastEvent.event_type}</div>
+                    <div className="text-xs text-gray-500">
+                      Avg position: step {lastEvent.average_position.toFixed(1)}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold">{lastEvent.count.toLocaleString()}</div>
+                  <div className="text-xs text-gray-500">{(lastEvent.percentage * 100).toFixed(1)}% of users</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

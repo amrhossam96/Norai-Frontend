@@ -21,7 +21,8 @@ export default function DashboardPage() {
       try {
         setIsLoading(true);
         const data = await getProjectOverview(selectedProjectId);
-        setOverview(data.overview);
+        // The API now returns ProjectOverview directly
+        setOverview(data);
       } catch (error: any) {
         toast.error(error.message || 'Failed to load dashboard data');
       } finally {

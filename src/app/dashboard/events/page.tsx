@@ -23,6 +23,9 @@ export default function EventsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Calculate offset from page
+  const offset = (page - 1) * limit;
+
   useEffect(() => {
     const loadEvents = async () => {
       if (!selectedProjectId) {
@@ -32,7 +35,6 @@ export default function EventsPage() {
 
       try {
         setIsLoading(true);
-        const offset = (page - 1) * limit;
         const response = await getEvents(selectedProjectId, {
           startDate: startDate || undefined,
           endDate: endDate || undefined,
@@ -43,26 +45,16 @@ export default function EventsPage() {
           offset,
         });
 
-        // Handle both wrapped and unwrapped responses
-        let eventsData: any[] = [];
-        let totalCount = 0;
-
-        if (Array.isArray(response)) {
-          eventsData = response;
-          totalCount = response.length;
-        } else if (response && typeof response === 'object') {
-          // Try different possible response structures
-          eventsData = response.data || response.events || response.results || [];
-          totalCount = response.total || response.count || response.total_count || eventsData.length;
-        }
-
-        // Ensure eventsData is always an array
-        if (!Array.isArray(eventsData)) {
-          eventsData = [];
-        }
+        // Response structure: { events: [], pagination: { has_more, limit, offset } }
+        const eventsData = response.events || [];
+        const hasMore = response.pagination?.has_more || false;
 
         setEvents(eventsData);
-        setTotal(totalCount);
+        // Estimate total based on current page and hasMore
+        const estimatedTotal = hasMore 
+          ? offset + eventsData.length + 1 
+          : offset + eventsData.length;
+        setTotal(estimatedTotal);
       } catch (error: any) {
         toast.error(error.message || 'Failed to load events');
         setEvents([]);
@@ -72,7 +64,7 @@ export default function EventsPage() {
     };
 
     loadEvents();
-  }, [selectedProjectId, page, eventType, anonymousId, externalUserId, startDate, endDate]);
+  }, [selectedProjectId, page, offset, eventType, anonymousId, externalUserId, startDate, endDate]);
 
   const handleResetFilters = () => {
     setEventType('');

@@ -78,7 +78,6 @@ export default function RegisterPage() {
                   placeholder="John"
                 />
               </div>
-
               <div>
                 <label htmlFor="lastName" className="block text-sm font-medium text-gray-300 mb-2">
                   Last Name
