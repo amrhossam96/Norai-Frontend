@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getAuthToken } from '@/lib/auth';
+import { getAuthToken, removeAuthToken } from '@/lib/auth';
 
 export interface RealtimeEvent {
   id: string;
@@ -223,18 +223,25 @@ export function useRealtimeEvents({
         } else if (errorMessage.includes('404')) {
           errorMessage = 'Endpoint not found. Real-time events may not be enabled for this project.';
         } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
-          errorMessage = 'Authentication failed. Please log in again.';
+          // Standard handling: clear auth and redirect to login
+          if (typeof window !== 'undefined') {
+            removeAuthToken();
+            window.location.href = '/login';
+          }
+          errorMessage = 'Authentication failed';
         }
         
         setError(errorMessage);
         setStatus('error');
 
         // Only auto-reconnect for network errors, not server errors
+        // Don't reconnect on 401/403 (auth failure - user needs to log in)
         const isServerError =
           errorMessage.includes('500') ||
           errorMessage.includes('404') ||
           errorMessage.includes('401') ||
-          errorMessage.includes('403');
+          errorMessage.includes('403') ||
+          errorMessage.includes('Authentication failed');
         
         if (autoReconnect && !isServerError) {
           const delay = reconnectDelay * Math.pow(2, reconnectAttemptsRef.current);

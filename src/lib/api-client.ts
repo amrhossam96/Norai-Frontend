@@ -1,4 +1,4 @@
-import { getAuthHeaders } from './auth';
+import { getAuthHeaders, removeAuthToken } from './auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const ML_API_URL = process.env.NEXT_PUBLIC_ML_API_URL || 'http://localhost:8000';
@@ -14,7 +14,21 @@ interface SuccessResponse<T> {
 }
 
 // Helper to parse error responses
-async function parseErrorResponse(response: Response): Promise<string> {
+async function parseErrorResponse(response: Response, requestUrl?: string): Promise<string> {
+  // Standard 401/403 handling: clear auth and redirect to login
+  // But don't redirect if we're already on the login/register page (would cause redirect loop)
+  if ((response.status === 401 || response.status === 403) && typeof window !== 'undefined') {
+    const isAuthEndpoint = requestUrl?.includes('/auth/token') || requestUrl?.includes('/auth/user');
+    const isOnAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+    
+    // Only redirect if we're not on auth pages and not calling auth endpoints
+    if (!isAuthEndpoint && !isOnAuthPage && window.location.pathname.startsWith('/dashboard')) {
+      removeAuthToken();
+      window.location.href = '/login';
+      return 'Unauthorized';
+    }
+  }
+
   try {
     const data: ErrorResponse = await response.json();
     return data.error || `Request failed with status ${response.status}`;
@@ -26,7 +40,8 @@ async function parseErrorResponse(response: Response): Promise<string> {
 // ==================== Authentication ====================
 
 export async function login(email: string, password: string): Promise<string> {
-  const response = await fetch(`${API_URL}/v1/auth/token`, {
+  const url = `${API_URL}/v1/auth/token`;
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -35,7 +50,7 @@ export async function login(email: string, password: string): Promise<string> {
   });
 
   if (!response.ok) {
-    const errorMessage = await parseErrorResponse(response);
+    const errorMessage = await parseErrorResponse(response, url);
     throw new Error(errorMessage);
   }
 
@@ -66,7 +81,8 @@ export async function register(
   email: string,
   password: string
 ): Promise<void> {
-  const response = await fetch(`${API_URL}/v1/auth/user`, {
+  const url = `${API_URL}/v1/auth/user`;
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -80,7 +96,7 @@ export async function register(
   });
 
   if (!response.ok) {
-    const errorMessage = await parseErrorResponse(response);
+    const errorMessage = await parseErrorResponse(response, url);
     throw new Error(errorMessage);
   }
 }
@@ -948,113 +964,6 @@ export async function revokeAPIKey(projectId: string, keyId: string): Promise<vo
 
 // ==================== Event Taxonomies ====================
 
-export interface EventTaxonomy {
-  id: string;
-  category_name: string;
-  weight: number;
-  description: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export async function getEventTaxonomies(): Promise<EventTaxonomy[]> {
-  const response = await fetch(`${API_URL}/v1/events/taxonomies`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    const errorMessage = await parseErrorResponse(response);
-    throw new Error(errorMessage);
-  }
-
-  const data: SuccessResponse<EventTaxonomy[]> | EventTaxonomy[] = await response.json();
-  
-  if (data && typeof data === 'object' && 'data' in data) {
-    return (data as SuccessResponse<EventTaxonomy[]>).data || [];
-  }
-  
-  if (Array.isArray(data)) {
-    return data;
-  }
-  
-  return [];
-}
-
-export async function getEventTaxonomyById(taxId: string): Promise<EventTaxonomy> {
-  const response = await fetch(`${API_URL}/v1/events/taxonomies/${taxId}`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    const errorMessage = await parseErrorResponse(response);
-    throw new Error(errorMessage);
-  }
-
-  const data: SuccessResponse<EventTaxonomy> | EventTaxonomy = await response.json();
-  
-  if (data && typeof data === 'object' && 'data' in data) {
-    return (data as SuccessResponse<EventTaxonomy>).data;
-  }
-  
-  return data as EventTaxonomy;
-}
-
-export async function createEventTaxonomy(
-  categoryName: string,
-  weight: number,
-  description: string
-): Promise<void> {
-  const response = await fetch(`${API_URL}/v1/events/taxonomies`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({
-      category_name: categoryName,
-      weight,
-      description,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorMessage = await parseErrorResponse(response);
-    throw new Error(errorMessage);
-  }
-}
-
-export async function updateEventTaxonomy(
-  taxId: string,
-  categoryName: string,
-  weight: number,
-  description: string
-): Promise<void> {
-  const response = await fetch(`${API_URL}/v1/events/taxonomies/${taxId}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({
-      category_name: categoryName,
-      weight,
-      description,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorMessage = await parseErrorResponse(response);
-    throw new Error(errorMessage);
-  }
-}
-
-export async function deleteEventTaxonomy(taxId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/v1/events/taxonomies/${taxId}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    const errorMessage = await parseErrorResponse(response);
-    throw new Error(errorMessage);
-  }
-}
 
 // ==================== Event Types ====================
 
@@ -1062,11 +971,11 @@ export interface EventType {
   id: string;
   project_id: string;
   event_name: string;
-  taxonomy_id: string;
-  status: 'draft' | 'active' | 'deprecated' | 'blocked';
-  source: 'sdk' | 'ui';
   description?: string;
+  status: 'active' | 'blocked';
+  source: 'sdk' | 'ui' | 'api';
   created_at?: string;
+  updated_at?: string;
 }
 
 export async function getEventTypes(): Promise<EventType[]> {
@@ -1093,10 +1002,105 @@ export async function getEventTypes(): Promise<EventType[]> {
   return [];
 }
 
+// ==================== Project Setup ====================
+
+export interface ProjectSetupState {
+  id: string;
+  project_id: string;
+  status: 'not_started' | 'in_progress' | 'completed';
+  last_step: number | null;
+  first_event_seen_at: string | null;
+  last_event_check_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getProjectSetup(projectId: string): Promise<ProjectSetupState> {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/setup`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    // If 404, return default state (setup record doesn't exist yet)
+    if (response.status === 404) {
+      console.log('Setup record not found (404), returning defaults');
+      return {
+        id: '',
+        project_id: projectId,
+        status: 'not_started',
+        last_step: null,
+        first_event_seen_at: null,
+        last_event_check_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
+    
+    // For 500, try to parse response - backend might return data even with 500
+    if (response.status === 500) {
+      try {
+        const json = await response.json();
+        if (json.data) {
+          console.log('Got setup data despite 500 status:', json.data);
+          return json.data;
+        }
+      } catch {
+        // If parsing fails, return defaults
+      }
+      console.log('Setup endpoint returned 500, returning defaults');
+      return {
+        id: '',
+        project_id: projectId,
+        status: 'not_started',
+        last_step: null,
+        first_event_seen_at: null,
+        last_event_check_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
+    
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  const json = await response.json();
+  console.log('Setup state received:', json.data);
+  return json.data;
+}
+
+export async function updateProjectSetup(
+  projectId: string,
+  status: 'in_progress' | 'completed',
+  lastStep?: number
+): Promise<ProjectSetupState> {
+  const body: Record<string, any> = { status };
+  if (lastStep !== undefined) {
+    body.last_step = lastStep;
+  }
+
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/setup`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw new Error(errorMessage);
+  }
+
+  const json = await response.json();
+  return json.data;
+}
+
 export async function createEventType(
   projectId: string,
   eventName: string,
-  taxonomyId: string,
   description?: string
 ): Promise<EventType> {
   const response = await fetch(`${API_URL}/v1/events/types`, {
@@ -1108,7 +1112,6 @@ export async function createEventType(
     body: JSON.stringify({
       project_id: projectId,
       event_name: eventName,
-      taxonomy_id: taxonomyId,
       description: description,
     }),
   });

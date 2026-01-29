@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, Plus } from 'lucide-react';
 import { getProjects, Project } from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -13,6 +14,7 @@ export default function ProjectSelector({
   selectedProjectId: string | null;
   onProjectChange: (projectId: string) => void;
 }) {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -90,11 +92,21 @@ export default function ProjectSelector({
     setIsOpen(false);
   };
 
+  const handleCreateProject = () => {
+    setIsModalOpen(true);
+  };
+
   const handleProjectCreated = async (newProjectId?: string) => {
-    await loadProjects();
-    // Auto-select the newly created project if ID is provided
+    setIsModalOpen(false);
     if (newProjectId) {
+      // Navigate immediately to setup for this project (don't wait for projects to reload)
+      router.push(`/dashboard/projects/setup?projectId=${newProjectId}`);
+      // Select the new project and reload projects in the background
       onProjectChange(newProjectId);
+      await loadProjects();
+    } else {
+      // If no project ID, just reload projects
+      await loadProjects();
     }
   };
 
@@ -112,7 +124,7 @@ export default function ProjectSelector({
         <div className="px-4 py-3 bg-white/5 border border-white/10 rounded-lg flex items-center justify-between">
           <p className="text-sm text-gray-400">No projects yet</p>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleCreateProject}
             className="px-4 py-2 bg-white text-black rounded-lg hover:bg-gray-200 transition-all font-medium cursor-pointer flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
@@ -186,7 +198,7 @@ export default function ProjectSelector({
                   <button
                     onClick={() => {
                       setIsOpen(false);
-                      setIsModalOpen(true);
+                      handleCreateProject();
                     }}
                     className="w-full px-4 py-3 rounded-lg text-white hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer"
                   >

@@ -47,17 +47,21 @@ export function CodeHighlighter({ code, language, showLineNumbers = true, custom
     return <div className="animate-pulse bg-gray-100 dark:bg-gray-800 h-32 rounded-lg"></div>
   }
 
+  // Use customStyle padding if provided, otherwise default to 0.75rem
+  const defaultPadding = customStyle?.padding !== undefined ? undefined : "0.75rem";
+  
   return (
     <div 
       style={{
         margin: 0,
-        padding: "0.75rem",
+        padding: defaultPadding,
         borderRadius: "0.375rem",
         overflow: "auto",
+        fontSize: "inherit",
         ...customStyle,
       }}
       dangerouslySetInnerHTML={{ __html: highlightedCode }}
-      className="syntax-highlighter"
+      className="syntax-highlighter [&_pre]:!m-0 [&_pre]:!p-0 [&_pre]:!bg-transparent [&_code]:text-[inherit] [&_code]:!text-[11px]"
     />
   )
 }

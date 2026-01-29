@@ -3,9 +3,8 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, X, Loader2, Tag, FileText, Eye } from 'lucide-react';
-import { getEventTaxonomies, getEventTypes, createEventType, createEventTaxonomy, EventTaxonomy, EventType } from '@/lib/api-client';
+import { getEventTypes, createEventType, EventType } from '@/lib/api-client';
 import { toast } from 'sonner';
-import Select from '@/components/ui/select';
 
 interface EventTypeRegistrationProps {
   projectId: string;
@@ -14,37 +13,14 @@ interface EventTypeRegistrationProps {
 
 export default function EventTypeRegistration({ projectId, onEventTypeCreated }: EventTypeRegistrationProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isCreateTaxonomyModalOpen, setIsCreateTaxonomyModalOpen] = useState(false);
   const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
-  const [taxonomies, setTaxonomies] = useState<EventTaxonomy[]>([]);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
-  const [isLoadingTaxonomies, setIsLoadingTaxonomies] = useState(false);
   const [isLoadingEventTypes, setIsLoadingEventTypes] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  const [isCreatingTaxonomy, setIsCreatingTaxonomy] = useState(false);
 
   // Form state
   const [eventName, setEventName] = useState('');
-  const [selectedTaxonomyId, setSelectedTaxonomyId] = useState('');
   const [description, setDescription] = useState('');
-
-  // Taxonomy form state
-  const [taxonomyCategoryName, setTaxonomyCategoryName] = useState('');
-  const [taxonomyWeight, setTaxonomyWeight] = useState('0');
-  const [taxonomyDescription, setTaxonomyDescription] = useState('');
-
-  const loadTaxonomies = async () => {
-    try {
-      setIsLoadingTaxonomies(true);
-      const data = await getEventTaxonomies();
-      setTaxonomies(data || []);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to load taxonomies');
-      setTaxonomies([]);
-    } finally {
-      setIsLoadingTaxonomies(false);
-    }
-  };
 
   const loadEventTypes = async () => {
     try {
@@ -66,12 +42,9 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
   }, [projectId]);
 
   useEffect(() => {
-    if (isModalOpen) {
-      loadTaxonomies();
-    } else {
+    if (!isModalOpen) {
       // Reset form when modal closes
       setEventName('');
-      setSelectedTaxonomyId('');
       setDescription('');
     }
   }, [isModalOpen]);
@@ -79,8 +52,8 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!eventName.trim() || !selectedTaxonomyId) {
-      toast.error('Please fill in all required fields');
+    if (!eventName.trim()) {
+      toast.error('Please enter an event name');
       return;
     }
 
@@ -90,12 +63,10 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
       await createEventType(
         projectId,
         eventName.trim(),
-        selectedTaxonomyId,
         description.trim() || undefined
       );
       toast.success('Event type registered successfully!');
       setEventName('');
-      setSelectedTaxonomyId('');
       setDescription('');
       setIsModalOpen(false);
       loadEventTypes(); // Refresh the list
@@ -106,39 +77,6 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
       setIsCreating(false);
     }
   };
-
-  const handleCreateTaxonomy = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!taxonomyCategoryName.trim() || !taxonomyDescription.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    const weightNum = parseFloat(taxonomyWeight);
-    if (isNaN(weightNum) || weightNum < -1 || weightNum > 1) {
-      toast.error('Weight must be between -1 and 1');
-      return;
-    }
-
-    setIsCreatingTaxonomy(true);
-
-    try {
-      await createEventTaxonomy(taxonomyCategoryName.trim(), weightNum, taxonomyDescription.trim());
-      toast.success('Taxonomy created successfully!');
-      setTaxonomyCategoryName('');
-      setTaxonomyWeight('0');
-      setTaxonomyDescription('');
-      setIsCreateTaxonomyModalOpen(false);
-      loadTaxonomies(); // Refresh taxonomies list
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create taxonomy');
-    } finally {
-      setIsCreatingTaxonomy(false);
-    }
-  };
-
-  const selectedTaxonomy = taxonomies.find(t => t.id === selectedTaxonomyId);
 
   return (
     <>
@@ -191,7 +129,6 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
           </div>
           <div className="space-y-2">
             {eventTypes.slice(0, 3).map((eventType) => {
-              const taxonomy = taxonomies.find(t => t.id === eventType.taxonomy_id);
               return (
                 <div
                   key={eventType.id}
@@ -202,17 +139,10 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
                       <div className="flex items-center gap-3 mb-2">
                         <Tag className="w-5 h-5 text-gray-400" />
                         <span className="font-semibold">{eventType.event_name}</span>
-                        {taxonomy && (
-                          <span className="px-2 py-1 text-xs bg-white/10 rounded border border-white/20">
-                            {taxonomy.category_name}
-                          </span>
-                        )}
                         {eventType.status && (
                           <span className={`px-2 py-1 text-xs rounded border ${
                             eventType.status === 'active' 
                               ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                              : eventType.status === 'draft'
-                              ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
                               : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
                           }`}>
                             {eventType.status}
@@ -253,7 +183,7 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">Register Event Type</h2>
               <p className="text-gray-400 text-sm">
-                Register a new event type and assign it to a taxonomy
+                Register a new event type for your project
               </p>
             </div>
 
@@ -277,58 +207,6 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
                 <p className="mt-1 text-xs text-gray-500">Use snake_case (e.g., product_viewed, add_to_cart)</p>
               </div>
 
-              <div>
-                <label htmlFor="taxonomy" className="block text-sm font-medium text-gray-300 mb-2">
-                  Taxonomy <span className="text-red-400">*</span>
-                </label>
-                {isLoadingTaxonomies ? (
-                  <div className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                    <span className="text-gray-400">Loading taxonomies...</span>
-                  </div>
-                ) : taxonomies.length === 0 ? (
-                  <div className="space-y-3">
-                    <div className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-gray-400 text-sm">
-                      No taxonomies available. Create one to continue.
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsCreateTaxonomyModalOpen(true)}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white hover:bg-white/20 transition-all text-sm font-medium cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Create Taxonomy
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <Select
-                      value={selectedTaxonomyId}
-                      onChange={setSelectedTaxonomyId}
-                      options={taxonomies.map(tax => ({
-                        value: tax.id,
-                        label: `${tax.category_name} (weight: ${tax.weight})`,
-                      }))}
-                      placeholder="Select a taxonomy"
-                    />
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setIsCreateTaxonomyModalOpen(true)}
-                        className="text-xs text-gray-400 hover:text-white transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Create New
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {selectedTaxonomy && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    {selectedTaxonomy.description}
-                  </p>
-                )}
-              </div>
 
               <div>
                 <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-2">
@@ -355,7 +233,7 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
                 </button>
                 <button
                   type="submit"
-                  disabled={isCreating || !eventName.trim() || !selectedTaxonomyId || isLoadingTaxonomies}
+                  disabled={isCreating || !eventName.trim()}
                   className="flex-1 px-4 py-3 bg-white text-black rounded-lg hover:bg-gray-200 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 >
                   {isCreating ? (
@@ -365,110 +243,6 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
                     </>
                   ) : (
                     'Register Event Type'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Create Taxonomy Modal */}
-      {isCreateTaxonomyModalOpen && typeof window !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
-            onClick={() => setIsCreateTaxonomyModalOpen(false)}
-          />
-          <div className="relative bg-black border border-white/10 rounded-[24px] p-8 w-full max-w-md backdrop-blur-xl z-[10001] animate-in fade-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setIsCreateTaxonomyModalOpen(false)}
-              className="absolute top-4 right-4 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
-            >
-              <X className="w-5 h-5 text-white" />
-            </button>
-
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold mb-2">Create Taxonomy</h2>
-              <p className="text-gray-400 text-sm">
-                Create a new taxonomy category for event types
-              </p>
-            </div>
-
-            <form onSubmit={handleCreateTaxonomy} className="space-y-6">
-              <div>
-                <label htmlFor="taxonomyCategoryName" className="block text-sm font-medium text-gray-300 mb-2">
-                  Category Name <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="taxonomyCategoryName"
-                  type="text"
-                  value={taxonomyCategoryName}
-                  onChange={(e) => setTaxonomyCategoryName(e.target.value)}
-                  required
-                  minLength={2}
-                  maxLength={100}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-white/20 focus:bg-white/10 transition-all cursor-text"
-                  placeholder="e.g., Engagement, Conversion, Navigation"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="taxonomyWeight" className="block text-sm font-medium text-gray-300 mb-2">
-                  Weight <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="taxonomyWeight"
-                  type="number"
-                  step="0.01"
-                  min="-1"
-                  max="1"
-                  value={taxonomyWeight}
-                  onChange={(e) => setTaxonomyWeight(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-white/20 focus:bg-white/10 transition-all cursor-text"
-                />
-                <p className="mt-1 text-xs text-gray-500">Range: -1 to 1. Affects recommendation weighting.</p>
-              </div>
-
-              <div>
-                <label htmlFor="taxonomyDescription" className="block text-sm font-medium text-gray-300 mb-2">
-                  Description <span className="text-red-400">*</span>
-                </label>
-                <textarea
-                  id="taxonomyDescription"
-                  value={taxonomyDescription}
-                  onChange={(e) => setTaxonomyDescription(e.target.value)}
-                  required
-                  minLength={5}
-                  maxLength={255}
-                  rows={3}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-white/20 focus:bg-white/10 transition-all cursor-text resize-none"
-                  placeholder="Describe this taxonomy category..."
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateTaxonomyModalOpen(false)}
-                  className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-all font-medium cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingTaxonomy || !taxonomyCategoryName.trim() || !taxonomyDescription.trim()}
-                  className="flex-1 px-4 py-3 bg-white text-black rounded-lg hover:bg-gray-200 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
-                >
-                  {isCreatingTaxonomy ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Taxonomy'
                   )}
                 </button>
               </div>
@@ -502,7 +276,6 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
 
             <div className="flex-1 overflow-y-auto pr-2 space-y-3">
               {eventTypes.map((eventType) => {
-                const taxonomy = taxonomies.find(t => t.id === eventType.taxonomy_id);
                 return (
                   <div
                     key={eventType.id}
@@ -513,17 +286,10 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
                         <div className="flex items-center gap-3 mb-2">
                           <Tag className="w-5 h-5 text-gray-400" />
                           <span className="font-semibold">{eventType.event_name}</span>
-                          {taxonomy && (
-                            <span className="px-2 py-1 text-xs bg-white/10 rounded border border-white/20">
-                              {taxonomy.category_name}
-                            </span>
-                          )}
                           {eventType.status && (
                             <span className={`px-2 py-1 text-xs rounded border ${
                               eventType.status === 'active' 
                                 ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                                : eventType.status === 'draft'
-                                ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
                                 : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
                             }`}>
                               {eventType.status}
@@ -532,11 +298,6 @@ export default function EventTypeRegistration({ projectId, onEventTypeCreated }:
                         </div>
                         {eventType.description && (
                           <p className="text-sm text-gray-400">{eventType.description}</p>
-                        )}
-                        {taxonomy && (
-                          <p className="text-xs text-gray-500 mt-2">
-                            Taxonomy: {taxonomy.description}
-                          </p>
                         )}
                       </div>
                     </div>

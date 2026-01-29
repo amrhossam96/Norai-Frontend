@@ -39,24 +39,17 @@ export default function EventTypeSelect({
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      // Calculate position for portal
+
+      // Calculate position for portal – always open just below the button
       if (buttonRef.current) {
         const rect = buttonRef.current.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-        const dropdownMaxHeight = 240; // max-h-60 = 240px
-        const spaceBelow = viewportHeight - rect.bottom - 8; // 8px for gap
-        const spaceAbove = rect.top - 8; // 8px for gap
-        const openAbove = spaceBelow < dropdownMaxHeight && spaceAbove > spaceBelow;
-        
-        // Calculate available height
-        const availableHeight = openAbove ? spaceAbove : spaceBelow;
-        const maxHeight = Math.min(dropdownMaxHeight, availableHeight);
-        
+        const dropdownMaxHeight = 240; // px
+
         setPosition({
-          top: openAbove ? rect.top - maxHeight - 8 : rect.bottom + 8,
+          top: rect.bottom + 8, // small gap below the field
           left: rect.left,
           width: rect.width,
-          maxHeight,
+          maxHeight: dropdownMaxHeight,
         });
       }
     }
@@ -71,75 +64,79 @@ export default function EventTypeSelect({
     const found = options.find(opt => String(opt.id) === String(value));
     return found;
   }, [options, value]);
+  const dropdownContent = isOpen && typeof window !== 'undefined'
+    ? createPortal(
+        <>
+          {/* Backdrop to capture outside clicks */}
+          <div
+            className="fixed inset-0 z-[10001]"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsOpen(false);
+            }}
+          />
+          {/* Dropdown panel */}
+          <div
+            className="fixed bg-black border border-white/10 rounded-lg shadow-xl z-[10002] overflow-y-auto animate-dropdown-slide-down"
+            style={{
+              top: `${position.top}px`,
+              left: `${position.left}px`,
+              width: `${position.width}px`,
+              maxHeight: `${position.maxHeight}px`,
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <div className="p-1">
+              {options.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onChange(option.id);
+                    setTimeout(() => {
+                      setIsOpen(false);
+                    }, 0);
+                  }}
+                  className={cn(
+                    'w-full px-4 py-2 rounded-lg text-left transition-all cursor-pointer',
+                    String(value) === String(option.id)
+                      ? 'bg-white/10 text-white'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  )}
+                >
+                  {option.event_name}
+                </button>
+              ))}
 
-  const dropdownContent = isOpen && typeof window !== 'undefined' ? (
-    <>
-      <div
-        className="fixed inset-0 z-[10001] animate-in fade-in duration-200"
-        onMouseDown={(e) => {
-          e.preventDefault();
-          setIsOpen(false);
-        }}
-      />
-      {createPortal(
-        <div
-          className="fixed bg-black border border-white/10 rounded-lg shadow-xl z-[10002] overflow-y-auto animate-in fade-in zoom-in-95 duration-200"
-          style={{
-            top: `${position.top}px`,
-            left: `${position.left}px`,
-            width: `${position.width}px`,
-            maxHeight: `${position.maxHeight}px`,
-          }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          <div className="p-1">
-            {options.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onChange(option.id);
-                  setTimeout(() => {
+              {/* Register New Option */}
+              <div className={cn(
+                options.length > 0 && "border-t border-white/10 mt-1 pt-1",
+                options.length === 0 && "pt-0"
+              )}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setIsOpen(false);
-                  }, 0);
-                }}
-                className={cn(
-                  'w-full px-4 py-2 rounded-lg text-left transition-all cursor-pointer',
-                  String(value) === String(option.id)
-                    ? 'bg-white/10 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                )}
-              >
-                {option.event_name}
-              </button>
-            ))}
-            
-            {/* Register New Option */}
-            <div className="border-t border-white/10 mt-1 pt-1">
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsOpen(false);
-                  onRegisterNew();
-                }}
-                className="w-full px-4 py-2 rounded-lg text-left transition-all cursor-pointer text-gray-400 hover:text-white hover:bg-white/5 flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Register new event type
-              </button>
+                    onRegisterNew();
+                  }}
+                  className="w-full px-4 py-2 rounded-lg text-left transition-all cursor-pointer text-gray-400 hover:text-white hover:bg-white/5 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Register new event type
+                </button>
+              </div>
             </div>
           </div>
-        </div>,
+        </>,
         document.body
-      )}
-    </>
-  ) : null;
+      )
+    : null;
 
   return (
     <div ref={selectRef} className={cn('relative', className)}>

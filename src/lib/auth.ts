@@ -26,6 +26,9 @@ export function removeAuthToken(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('auth_token');
   localStorage.removeItem('user_email');
+  localStorage.removeItem('user_avatar_url');
+  localStorage.removeItem('user_first_name');
+  localStorage.removeItem('user_last_name');
   // Also remove cookie
   document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
 }

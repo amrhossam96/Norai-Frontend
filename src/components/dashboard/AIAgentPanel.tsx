@@ -65,13 +65,13 @@ export default function AIAgentPanel() {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating circular button - bottom right, below modals */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-white text-black shadow-lg hover:bg-gray-100 transition-all cursor-pointer border border-white/60"
+        className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-white text-black shadow-lg hover:bg-gray-100 transition-all cursor-pointer border border-white/60 flex items-center justify-center"
+        title="Ask Norai (Beta)"
       >
-        <Sparkles className="w-4 h-4" />
-        <span className="text-sm font-medium">Ask Norai (Beta)</span>
+        <Sparkles className="w-5 h-5" />
       </button>
 
       {/* Slide-in panel */}

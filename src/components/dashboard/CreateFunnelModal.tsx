@@ -6,11 +6,8 @@ import { X, Plus, Trash2 } from 'lucide-react';
 import { 
   createFunnel, 
   getEventTypes, 
-  getEventTaxonomies,
   createEventType,
-  createEventTaxonomy,
-  EventType,
-  EventTaxonomy
+  EventType
 } from '@/lib/api-client';
 import { useDashboard } from '@/contexts/DashboardContext';
 import { toast } from 'sonner';
@@ -35,21 +32,11 @@ export default function CreateFunnelModal({ isOpen, onClose, onSuccess }: Create
   // Event type creation state
   const [isCreateEventTypeModalOpen, setIsCreateEventTypeModalOpen] = useState(false);
   const [createEventTypeStepIndex, setCreateEventTypeStepIndex] = useState<number | null>(null);
-  const [taxonomies, setTaxonomies] = useState<EventTaxonomy[]>([]);
-  const [isLoadingTaxonomies, setIsLoadingTaxonomies] = useState(false);
   const [isCreatingEventType, setIsCreatingEventType] = useState(false);
-  const [isCreatingTaxonomy, setIsCreatingTaxonomy] = useState(false);
   
   // Event type form state
   const [eventTypeName, setEventTypeName] = useState('');
-  const [selectedTaxonomyId, setSelectedTaxonomyId] = useState('');
   const [eventTypeDescription, setEventTypeDescription] = useState('');
-  
-  // Taxonomy form state
-  const [taxonomyName, setTaxonomyName] = useState('');
-  const [taxonomyWeight, setTaxonomyWeight] = useState('0');
-  const [taxonomyDescription, setTaxonomyDescription] = useState('');
-  const [isCreateTaxonomyModalOpen, setIsCreateTaxonomyModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && selectedProjectId) {
@@ -73,23 +60,9 @@ export default function CreateFunnelModal({ isOpen, onClose, onSuccess }: Create
     }
   };
 
-  const loadTaxonomies = async () => {
-    try {
-      setIsLoadingTaxonomies(true);
-      const data = await getEventTaxonomies();
-      setTaxonomies(data || []);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to load taxonomies');
-      setTaxonomies([]);
-    } finally {
-      setIsLoadingTaxonomies(false);
-    }
-  };
-
   const handleOpenCreateEventType = (stepIndex: number) => {
     setCreateEventTypeStepIndex(stepIndex);
     setIsCreateEventTypeModalOpen(true);
-    loadTaxonomies();
   };
 
   const handleCreateEventType = async (e: React.FormEvent) => {
@@ -100,8 +73,8 @@ export default function CreateFunnelModal({ isOpen, onClose, onSuccess }: Create
       return;
     }
 
-    if (!eventTypeName.trim() || !selectedTaxonomyId) {
-      toast.error('Please fill in all required fields');
+    if (!eventTypeName.trim()) {
+      toast.error('Please enter an event name');
       return;
     }
 
@@ -111,7 +84,6 @@ export default function CreateFunnelModal({ isOpen, onClose, onSuccess }: Create
       const newEventType = await createEventType(
         selectedProjectId,
         eventTypeName.trim(),
-        selectedTaxonomyId,
         eventTypeDescription.trim() || undefined
       );
       
@@ -127,7 +99,6 @@ export default function CreateFunnelModal({ isOpen, onClose, onSuccess }: Create
       
       // Reset form
       setEventTypeName('');
-      setSelectedTaxonomyId('');
       setEventTypeDescription('');
       setIsCreateEventTypeModalOpen(false);
       setCreateEventTypeStepIndex(null);
@@ -135,46 +106,6 @@ export default function CreateFunnelModal({ isOpen, onClose, onSuccess }: Create
       toast.error(error.message || 'Failed to create event type');
     } finally {
       setIsCreatingEventType(false);
-    }
-  };
-
-  const handleCreateTaxonomy = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!taxonomyName.trim() || !taxonomyDescription.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    const weightNum = parseFloat(taxonomyWeight);
-    if (isNaN(weightNum) || weightNum < -1 || weightNum > 1) {
-      toast.error('Weight must be between -1 and 1');
-      return;
-    }
-
-    setIsCreatingTaxonomy(true);
-
-    try {
-      await createEventTaxonomy(
-        taxonomyName.trim(),
-        weightNum,
-        taxonomyDescription.trim()
-      );
-      
-      toast.success('Taxonomy created successfully!');
-      
-      // Reload taxonomies
-      await loadTaxonomies();
-      
-      // Reset form
-      setTaxonomyName('');
-      setTaxonomyWeight('0');
-      setTaxonomyDescription('');
-      setIsCreateTaxonomyModalOpen(false);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create taxonomy');
-    } finally {
-      setIsCreatingTaxonomy(false);
     }
   };
 
@@ -406,30 +337,6 @@ export default function CreateFunnelModal({ isOpen, onClose, onSuccess }: Create
               />
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-300">
-                  Taxonomy *
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateTaxonomyModalOpen(true)}
-                  className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  + Create Taxonomy
-                </button>
-              </div>
-              <Select
-                value={selectedTaxonomyId}
-                onChange={setSelectedTaxonomyId}
-                options={taxonomies.map(t => ({
-                  value: t.id,
-                  label: t.category_name,
-                }))}
-                placeholder={isLoadingTaxonomies ? "Loading taxonomies..." : "Select taxonomy"}
-                disabled={isLoadingTaxonomies}
-              />
-            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -457,98 +364,10 @@ export default function CreateFunnelModal({ isOpen, onClose, onSuccess }: Create
               </button>
               <button
                 type="submit"
-                disabled={isCreatingEventType || !eventTypeName.trim() || !selectedTaxonomyId}
+                disabled={isCreatingEventType || !eventTypeName.trim()}
                 className="px-6 py-2.5 bg-white text-black rounded-lg hover:bg-white/90 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isCreatingEventType ? 'Creating...' : 'Create Event Type'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>,
-      document.body
-    )
-  ) : null;
-
-  // Create Taxonomy Modal
-  const createTaxonomyModal = isCreateTaxonomyModalOpen && typeof window !== 'undefined' ? (
-    createPortal(
-      <div className="fixed inset-0 z-[10100] flex items-center justify-center p-4">
-        <div 
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={() => setIsCreateTaxonomyModalOpen(false)}
-        />
-        <div className="relative bg-black border border-white/10 rounded-[24px] p-8 w-full max-w-md max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Create Taxonomy</h2>
-            <button
-              onClick={() => setIsCreateTaxonomyModalOpen(false)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-all cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <form onSubmit={handleCreateTaxonomy} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Category Name *
-              </label>
-              <input
-                type="text"
-                value={taxonomyName}
-                onChange={(e) => setTaxonomyName(e.target.value)}
-                placeholder="e.g., User Actions"
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-white/20 focus:bg-white/10 transition-all cursor-text"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Weight * (between -1 and 1)
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="-1"
-                max="1"
-                value={taxonomyWeight}
-                onChange={(e) => setTaxonomyWeight(e.target.value)}
-                placeholder="0"
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-white/20 focus:bg-white/10 transition-all cursor-text"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Description *
-              </label>
-              <textarea
-                value={taxonomyDescription}
-                onChange={(e) => setTaxonomyDescription(e.target.value)}
-                placeholder="Description of the taxonomy"
-                rows={3}
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-white/20 focus:bg-white/10 transition-all cursor-text resize-none"
-                required
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setIsCreateTaxonomyModalOpen(false)}
-                className="px-6 py-2.5 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isCreatingTaxonomy || !taxonomyName.trim() || !taxonomyDescription.trim()}
-                className="px-6 py-2.5 bg-white text-black rounded-lg hover:bg-white/90 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {isCreatingTaxonomy ? 'Creating...' : 'Create Taxonomy'}
               </button>
             </div>
           </form>
@@ -562,7 +381,6 @@ export default function CreateFunnelModal({ isOpen, onClose, onSuccess }: Create
     <>
       {createPortal(modalContent, document.body)}
       {createEventTypeModal}
-      {createTaxonomyModal}
     </>
   );
 }

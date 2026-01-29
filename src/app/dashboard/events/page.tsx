@@ -156,7 +156,7 @@ export default function EventsPage() {
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-2">Register Event Type</h2>
                 <p className="text-sm text-gray-400">
-                  Register a new event type and assign it to a taxonomy
+                  Register a new event type for your project
                 </p>
               </div>
               <EventTypeRegistration
@@ -171,7 +171,7 @@ export default function EventsPage() {
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-2">Register Event Type</h2>
                 <p className="text-sm text-gray-400">
-                  Register a new event type and assign it to a taxonomy
+                  Register a new event type for your project
                 </p>
               </div>
               <div className="text-center py-12">
