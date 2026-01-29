@@ -130,6 +130,51 @@ export default function JourneysPage() {
         </div>
       )}
 
+      {/* Common Drop-off Points */}
+      {analysis && analysis.common_last_events && analysis.common_last_events.length > 0 && (
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <AlertCircle className="w-5 h-5 text-gray-400" />
+            <h2 className="text-lg font-semibold">Common Drop-off Points</h2>
+            <span className="text-sm text-gray-500">Where users most commonly end their journey</span>
+          </div>
+          
+          <div className="space-y-4">
+            {analysis.common_last_events.map((lastEvent, index) => {
+              // percentage: backend returns as 0-100, use directly
+              const percentage = lastEvent.percentage.toFixed(1);
+              const percentageNum = Math.min(100, lastEvent.percentage);
+              const barWidth = percentageNum;
+              
+              return (
+                <div key={lastEvent.event_type || index} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium">{lastEvent.event_type}</span>
+                      {lastEvent.average_position > 0 && (
+                        <span className="text-xs text-gray-500">
+                          Avg position: step {Math.round(lastEvent.average_position) + 1}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold">{lastEvent.count.toLocaleString()} users</div>
+                      <div className="text-xs text-gray-500">{percentage}% of users</div>
+                    </div>
+                  </div>
+                  <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-white h-2 rounded-full transition-all"
+                      style={{ width: `${barWidth}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Drop-off by Event Type */}
       <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] p-6">
         <div className="flex items-center gap-3 mb-6">
@@ -150,71 +195,61 @@ export default function JourneysPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {analysis.drop_off_by_event_type.map((dropOff, index) => {
-              const dropOffRate = (dropOff.drop_off_rate * 100).toFixed(1);
-
-              return (
-                <div
-                  key={dropOff.event_type || index}
-                  className="bg-white/5 border border-white/10 rounded-lg p-6 hover:bg-white/10 transition-all"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
-                        <AlertCircle className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <div className="font-semibold">{dropOff.event_type}</div>
-                        {dropOff.average_time_after > 0 && (
-                          <div className="text-sm text-gray-500 mt-1">
-                            Avg time to next event: {dropOff.average_time_after > 60 
-                              ? `${(dropOff.average_time_after / 60).toFixed(1)}m`
-                              : `${dropOff.average_time_after.toFixed(0)}s`
-                            }
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-red-400">{dropOffRate}%</div>
-                      <div className="text-xs text-gray-500">Drop-off Rate</div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/10">
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Users Reached</div>
-                      <div className="text-lg font-semibold">
-                        {dropOff.users_reached.toLocaleString()}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Dropped Off</div>
-                      <div className="text-lg font-semibold text-red-400">
-                        {dropOff.users_dropped_off.toLocaleString()}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Continued</div>
-                      <div className="text-lg font-semibold text-green-400">
-                        {dropOff.users_continued.toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="mt-4">
-                    <div className="w-full bg-white/5 rounded-full h-3 overflow-hidden">
-                      <div
-                        className="bg-red-400 h-3 rounded-full transition-all"
-                        style={{ width: `${Math.min(100, parseFloat(dropOffRate))}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-300">Event Type</th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-300">Reached</th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-300">Continued</th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-300">Dropped</th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-300">Drop-off Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analysis.drop_off_by_event_type.map((dropOff, index) => {
+                  const dropOffRate = dropOff.drop_off_rate.toFixed(1);
+                  const rate = parseFloat(dropOffRate);
+                  
+                  // Color coding: green (low), yellow (medium), red (high)
+                  let rateColor = 'text-green-400';
+                  if (rate >= 30) rateColor = 'text-red-400';
+                  else if (rate >= 15) rateColor = 'text-yellow-400';
+                  
+                  return (
+                    <tr
+                      key={dropOff.event_type || index}
+                      className="border-b border-white/5 hover:bg-white/5 transition-all"
+                    >
+                      <td className="py-4 px-4">
+                        <div className="font-medium">{dropOff.event_type}</div>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <div className="font-semibold">{dropOff.users_reached.toLocaleString()}</div>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <div className="font-semibold text-green-400">{dropOff.users_continued.toLocaleString()}</div>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <div className="font-semibold text-red-400">{dropOff.users_dropped_off.toLocaleString()}</div>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <div className={`font-bold ${rateColor}`}>{dropOffRate}%</div>
+                        {/* Visual indicator */}
+                        <div className="mt-1 w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className={`h-1.5 rounded-full transition-all ${
+                              rate >= 30 ? 'bg-red-400' : rate >= 15 ? 'bg-yellow-400' : 'bg-green-400'
+                            }`}
+                            style={{ width: `${Math.min(100, rate)}%` }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -229,28 +264,36 @@ export default function JourneysPage() {
           </div>
 
           <div className="space-y-3">
-            {analysis.common_last_events.map((lastEvent, index) => (
-              <div
-                key={lastEvent.event_type || index}
-                className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-sm font-bold">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <div className="font-medium">{lastEvent.event_type}</div>
-                    <div className="text-xs text-gray-500">
-                      Avg position: step {lastEvent.average_position.toFixed(1)}
+            {analysis.common_last_events.map((lastEvent, index) => {
+              // percentage: backend returns as 0-100, use directly
+              const displayPercentage = lastEvent.percentage;
+              const label = `${displayPercentage.toFixed(1)}% of users`;
+              
+              return (
+                <div
+                  key={lastEvent.event_type || index}
+                  className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-sm font-bold">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-medium">{lastEvent.event_type}</div>
+                      {lastEvent.average_position > 0 && (
+                        <div className="text-xs text-gray-500">
+                          Avg position: step {Math.round(lastEvent.average_position) + 1}
+                        </div>
+                      )}
                     </div>
                   </div>
+                  <div className="text-right">
+                    <div className="font-bold">{lastEvent.count.toLocaleString()} users</div>
+                    <div className="text-xs text-gray-500">{label}</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold">{lastEvent.count.toLocaleString()}</div>
-                  <div className="text-xs text-gray-500">{(lastEvent.percentage * 100).toFixed(1)}% of users</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

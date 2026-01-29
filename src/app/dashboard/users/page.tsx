@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, Search, Calendar, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Users, Search, Calendar, ChevronLeft, ChevronRight, ExternalLink, Map } from 'lucide-react';
 import { getUsers, getUserSummary } from '@/lib/api-client';
 import { useDashboard } from '@/contexts/DashboardContext';
 import { toast } from 'sonner';
 import DatePicker from '@/components/ui/date-picker';
 
 export default function UsersPage() {
+  const router = useRouter();
   const { selectedProjectId } = useDashboard();
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
@@ -251,6 +253,15 @@ export default function UsersPage() {
                   <div className="text-xs text-gray-500 mb-1">User ID</div>
                   <div className="font-medium text-sm break-all">{selectedUser}</div>
                 </div>
+
+                {/* View Journey Button */}
+                <button
+                  onClick={() => router.push(`/dashboard/users/${selectedUser}/journey`)}
+                  className="w-full py-2.5 px-4 bg-white/10 border border-white/20 rounded-lg hover:bg-white/20 transition-all flex items-center justify-center gap-2 text-sm font-medium cursor-pointer"
+                >
+                  <Map className="w-4 h-4" />
+                  View Journey
+                </button>
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
                   <div>

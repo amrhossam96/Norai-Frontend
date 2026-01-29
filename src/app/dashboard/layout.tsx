@@ -3,6 +3,7 @@
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import ProjectSelector from '@/components/dashboard/ProjectSelector';
 import { DashboardProvider, useDashboard } from '@/contexts/DashboardContext';
+import AIAgentPanel from '@/components/dashboard/AIAgentPanel';
 
 export default function DashboardLayout({
   children,
@@ -32,6 +33,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             />
           </div>
           {children}
+          {/* AI Agent floating button + right-side slide panel */}
+          <AIAgentPanel />
         </div>
       </main>
     </div>

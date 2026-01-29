@@ -124,13 +124,13 @@ export default function DatePicker({
   const calendarContent = isOpen && typeof window !== 'undefined' ? (
     <>
       <div
-        className="fixed inset-0 z-[9998]"
+        className="fixed inset-0 z-[9998] animate-in fade-in duration-200"
         onClick={() => setIsOpen(false)}
       />
       {createPortal(
         <div
           ref={datePickerRef}
-          className="fixed bg-black border border-white/10 rounded-lg shadow-xl z-[9999] p-4"
+          className="fixed bg-black border border-white/10 rounded-lg shadow-xl z-[9999] p-4 animate-in fade-in zoom-in-95 duration-200"
           style={{
             top: `${position.top}px`,
             left: `${position.left}px`,

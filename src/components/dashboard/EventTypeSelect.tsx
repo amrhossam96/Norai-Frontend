@@ -2,31 +2,29 @@
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EventType } from '@/lib/api-client';
 
-interface SelectOption {
-  value: string;
-  label: string;
-}
-
-interface SelectProps {
+interface EventTypeSelectProps {
   value: string;
   onChange: (value: string) => void;
-  options: SelectOption[];
+  options: EventType[];
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  onRegisterNew: () => void;
 }
 
-export default function Select({
+export default function EventTypeSelect({
   value,
   onChange,
   options,
   placeholder,
   className,
   disabled = false,
-}: SelectProps) {
+  onRegisterNew,
+}: EventTypeSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [position, setPosition] = React.useState({ top: 0, left: 0, width: 0, maxHeight: 240 });
   const selectRef = React.useRef<HTMLDivElement>(null);
@@ -70,7 +68,7 @@ export default function Select({
 
   const selectedOption = React.useMemo(() => {
     if (!value) return undefined;
-    const found = options.find(opt => String(opt.value) === String(value));
+    const found = options.find(opt => String(opt.id) === String(value));
     return found;
   }, [options, value]);
 
@@ -79,7 +77,6 @@ export default function Select({
       <div
         className="fixed inset-0 z-[10001] animate-in fade-in duration-200"
         onMouseDown={(e) => {
-          // Use onMouseDown instead of onClick to prevent race condition
           e.preventDefault();
           setIsOpen(false);
         }}
@@ -94,35 +91,49 @@ export default function Select({
             maxHeight: `${position.maxHeight}px`,
           }}
           onMouseDown={(e) => {
-            // Prevent backdrop from closing when clicking inside dropdown
             e.stopPropagation();
           }}
         >
           <div className="p-1">
             {options.map((option) => (
               <button
-                key={option.value}
+                key={option.id}
                 type="button"
                 onMouseDown={(e) => {
-                  // Use onMouseDown to ensure it fires before backdrop
                   e.preventDefault();
                   e.stopPropagation();
-                  onChange(option.value);
-                  // Use setTimeout to ensure state update happens before closing
+                  onChange(option.id);
                   setTimeout(() => {
                     setIsOpen(false);
                   }, 0);
                 }}
                 className={cn(
                   'w-full px-4 py-2 rounded-lg text-left transition-all cursor-pointer',
-                  String(value) === String(option.value)
+                  String(value) === String(option.id)
                     ? 'bg-white/10 text-white'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 )}
               >
-                {option.label}
+                {option.event_name}
               </button>
             ))}
+            
+            {/* Register New Option */}
+            <div className="border-t border-white/10 mt-1 pt-1">
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  onRegisterNew();
+                }}
+                className="w-full px-4 py-2 rounded-lg text-left transition-all cursor-pointer text-gray-400 hover:text-white hover:bg-white/5 flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Register new event type
+              </button>
+            </div>
           </div>
         </div>,
         document.body
@@ -149,7 +160,7 @@ export default function Select({
           key={`select-value-${value || 'empty'}`}
           className={selectedOption ? 'text-white' : 'text-gray-500'}
         >
-          {selectedOption?.label || placeholder || 'Select...'}
+          {selectedOption?.event_name || placeholder || 'Select event type...'}
         </span>
         <ChevronDown
           className={cn(
@@ -163,4 +174,3 @@ export default function Select({
     </div>
   );
 }
-

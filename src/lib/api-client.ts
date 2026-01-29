@@ -157,18 +157,27 @@ export async function getProjects(): Promise<Project[]> {
 
 export async function createProject(
   name: string,
-  description?: string
+  description?: string,
+  slug?: string
 ): Promise<Project> {
+  const payload: Record<string, any> = {
+    name,
+    description: description ?? '',
+  };
+
+  const trimmedSlug = slug?.trim();
+  // Only send slug if it is a non-empty, meaningful string
+  if (trimmedSlug && trimmedSlug.length > 0) {
+    payload.slug = trimmedSlug;
+  }
+
   const response = await fetch(`${API_URL}/v1/projects`, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      name,
-      description: description || '',
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -290,6 +299,8 @@ export interface PaginationMetadata {
   has_more: boolean;
   limit: number;
   offset: number;
+  returned?: number;
+  total?: number | null;
 }
 
 export interface EventsListResponse {
@@ -474,11 +485,15 @@ export async function getUserJourney(
     throw new Error(errorMessage);
   }
 
-  const data = await response.json();
-  if (data && typeof data === 'object' && 'data' in data) {
-    return data.data;
+  const json = await response.json();
+  // Response is wrapped: { data: { journey: { user, events, summary } } }
+  if (json && typeof json === 'object' && 'data' in json) {
+    if (json.data?.journey) {
+      return json.data.journey;
+    }
+    return json.data;
   }
-  return data;
+  return json;
 }
 
 // ==================== Funnels ====================
@@ -503,11 +518,16 @@ export interface FunnelAnalyticsStep {
   order: number;
   event_type: string;
   users: number;
+  display_percentage: number; // Decimal (0-1), the percentage to display (multiply by 100)
+  drop_off?: number; // Users who dropped off (optional)
+  conversion_from_previous?: number; // For reference (not needed for display)
+  overall_conversion?: number; // For reference (not needed for display)
 }
 
 export interface FunnelAnalytics {
   started: number;
   completed: number;
+  conversion: number; // Overall conversion rate (0-1)
   steps: FunnelAnalyticsStep[];
 }
 
@@ -752,20 +772,32 @@ export async function getEntityInsights(
 
 // ==================== Analytics ====================
 
+export interface TimeSeriesDataPoint {
+  date: string; // ISO 8601 date string
+  value: number; // int64
+}
+
+export interface TimeSeriesResponse {
+  period: 'day' | 'week' | 'month';
+  metric: 'events' | 'sessions' | 'active_users';
+  data_points: TimeSeriesDataPoint[];
+  total: number; // int64
+}
+
 export async function getTimeSeries(
   projectId: string,
   period: 'day' | 'week' | 'month',
   metric: 'events' | 'sessions' | 'active_users',
   startDate: string,
   endDate: string
-) {
+): Promise<TimeSeriesResponse> {
   const params = new URLSearchParams();
   params.append('period', period);
   params.append('metric', metric);
   params.append('start_date', startDate);
   params.append('end_date', endDate);
 
-  const response = await fetch(`${API_URL}/v1/projects/${projectId}/analytics/timeseries?${params}`, {
+  const response = await fetch(`${API_URL}/v1/projects/${projectId}/analytics/time-series?${params}`, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -775,7 +807,27 @@ export async function getTimeSeries(
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const json = await response.json();
+  // Response structure: { data: { period, metric, data_points: [], total } }
+  if (json && typeof json === 'object' && 'data' in json) {
+    return json.data;
+  }
+  return json;
+}
+
+export interface ComparisonResponse {
+  current_period: {
+    start_date: string; // ISO 8601
+    end_date: string; // ISO 8601
+  };
+  previous_period: {
+    start_date: string; // ISO 8601
+    end_date: string; // ISO 8601
+  };
+  current_value: number; // int64
+  previous_value: number; // int64
+  change: number; // float (percentage)
+  change_type: 'wow' | 'mom';
 }
 
 export async function getComparison(
@@ -784,7 +836,7 @@ export async function getComparison(
   metric: 'events' | 'sessions' | 'active_users',
   startDate: string,
   endDate: string
-) {
+): Promise<ComparisonResponse> {
   const params = new URLSearchParams();
   params.append('type', type);
   params.append('metric', metric);
@@ -801,7 +853,12 @@ export async function getComparison(
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const json = await response.json();
+  // Response structure: { data: { current_value, previous_value, change, change_type, ... } }
+  if (json && typeof json === 'object' && 'data' in json) {
+    return json.data;
+  }
+  return json;
 }
 
 // ==================== API Keys ====================

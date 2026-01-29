@@ -69,12 +69,12 @@ export default function CreateAPIKeyModal({ isOpen, onClose, onSuccess, projectI
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={handleClose}
       />
 
       {/* Modal */}
-      <div className="relative bg-black border border-white/10 rounded-[24px] p-8 w-full max-w-md backdrop-blur-xl">
+      <div className="relative bg-black border border-white/10 rounded-[24px] p-8 w-full max-w-md backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
         {/* Close button */}
         <button
           onClick={handleClose}
